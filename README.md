@@ -24,6 +24,8 @@ No GitHub Actions, o workflow **Windows installer** executa os testes JavaScript
 ## Primeiro recorte
 
 - Nova aba com favoritos de início e interface baseada no [Figma V3](https://www.figma.com/design/z0VTjnV3KAlis2UDNxif9b?node-id=15-29).
+- A nova aba oferece **Início**, **Widgets** (hora local e nota salva neste dispositivo) e **Retomar** (páginas abertas e páginas fechadas na sessão atual).
+- Arraste a alça pontilhada na barra superior para mover a janela. Use as bordas e os cantos para redimensionar.
 - Navegação HTTP(S) em webviews nativas e controles de histórico por aba. O Orla salva localmente os endereços e a aba selecionada. Ao reiniciar, carrega a aba selecionada e deixa as demais aguardando seleção. O histórico de voltar e avançar recomeça com cada nova execução.
 - O painel de abas permite buscar entre as abertas e reabrir a última aba fechada na execução atual. A estrela na barra adiciona ou remove páginas dos favoritos da nova aba.
 - Com foco na interface do Orla, use Ctrl+L para a barra de endereço, Ctrl+T para abrir aba, Ctrl+W para fechar e Ctrl+Shift+T para reabrir.
