@@ -8,6 +8,8 @@ use tauri::{
 
 const SHELL: &str = "orla";
 const TOOLBAR: f64 = 53.0;
+// Keep the shell reachable at the window edges when a site has focus.
+const RESIZE_EDGE: f64 = 6.0;
 
 type CommandResult = Result<(), String>;
 
@@ -35,6 +37,13 @@ fn website(url: &Url) -> bool {
 
 fn as_message(error: tauri::Error) -> String {
     error.to_string()
+}
+
+fn site_size(width: f64, height: f64) -> LogicalSize<f64> {
+    LogicalSize::new(
+        (width - RESIZE_EDGE * 2.0).max(1.0),
+        (height - TOOLBAR - RESIZE_EDGE).max(1.0),
+    )
 }
 
 fn tab_label(id: u32) -> String {
@@ -76,8 +85,8 @@ async fn navigate_tab(caller: Webview, app: AppHandle, id: u32, address: String)
     window
         .add_child(
             builder,
-            LogicalPosition::new(0.0, TOOLBAR),
-            LogicalSize::new(size.width, (size.height - TOOLBAR).max(1.0)),
+            LogicalPosition::new(RESIZE_EDGE, TOOLBAR),
+            site_size(size.width, size.height),
         )
         .map(|_| ())
         .map_err(as_message)
@@ -101,7 +110,7 @@ async fn show_tab(caller: Webview, app: AppHandle, id: Option<u32>) -> CommandRe
 #[tauri::command]
 async fn resize_tabs(caller: Webview, app: AppHandle, width: f64, height: f64) -> CommandResult {
     ui_only(&caller)?;
-    let size = LogicalSize::new(width.max(1.0), (height - TOOLBAR).max(1.0));
+    let size = site_size(width, height);
     for (label, view) in app.webviews() {
         if label.starts_with("tab-") {
             view.set_size(size).map_err(as_message)?;
@@ -126,28 +135,13 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
     .map_err(as_message)
 }
 
-#[tauri::command]
-async fn window_action(caller: Webview, app: AppHandle, action: String) -> CommandResult {
-    ui_only(&caller)?;
-    let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
-    match action.as_str() {
-        "minimize" => window.minimize(),
-        "maximize" if window.is_maximized().map_err(as_message)? => window.unmaximize(),
-        "maximize" => window.maximize(),
-        "close" => window.close(),
-        _ => return Err("Ação de janela inválida.".into()),
-    }
-    .map_err(as_message)
-}
-
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             navigate_tab,
             show_tab,
             resize_tabs,
-            tab_action,
-            window_action
+            tab_action
         ])
         .run(tauri::generate_context!())
         .expect("Não foi possível iniciar o Orla Browser");

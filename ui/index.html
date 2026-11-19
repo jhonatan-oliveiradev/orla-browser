@@ -19,7 +19,7 @@
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
-    <div class="window-grip" data-tauri-drag-region title="Arraste para mover a janela" aria-hidden="true"></div>
+    <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
       <button class="icon" data-window-action="minimize" aria-label="Minimizar"><img src="assets/min.svg" alt=""></button>
       <button class="icon" data-window-action="maximize" aria-label="Maximizar ou restaurar"><img src="assets/max.svg" alt=""></button>
@@ -72,6 +72,16 @@
       </div>
     </section>
   </main>
+  <div class="window-resize" aria-hidden="true">
+    <div data-resize="North"></div>
+    <div data-resize="NorthEast"></div>
+    <div data-resize="East"></div>
+    <div data-resize="SouthEast"></div>
+    <div data-resize="South"></div>
+    <div data-resize="SouthWest"></div>
+    <div data-resize="West"></div>
+    <div data-resize="NorthWest"></div>
+  </div>
   <p id="status" role="status" hidden></p>
   <dialog id="search-dialog" aria-label="Pesquisar ou digitar endereço">
     <form id="search-form">

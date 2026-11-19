@@ -1,11 +1,17 @@
 {
   "identifier": "orla",
-  "description": "Events and title bar gestures for the local browser interface",
-  "webviews": ["orla"],
+  "description": "Events and window controls for the local interface",
+  "webviews": [
+    "orla"
+  ],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
-    "core:window:allow-internal-toggle-maximize"
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close"
   ]
 }

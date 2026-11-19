@@ -28,8 +28,19 @@ button:disabled { opacity: .42; cursor: default; }
 .toolbar .address { flex: 1; padding: 0 13px; border-radius: 16px; color: var(--muted); }
 .address span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .window-actions { gap: 6px; }
-.window-grip { flex: 0 0 38px; height: 100%; display: grid; place-items: center; cursor: grab; }
-.window-grip::before { content: ''; width: 16px; height: 9px; opacity: .7; pointer-events: none; background: radial-gradient(circle, var(--muted) 1px, transparent 1.5px) 0 0 / 5px 4px; }
+.window-drag-space { flex: 0 0 38px; align-self: stretch; }
+/* Match RESIZE_EDGE in the native webview bounds. */
+.window-resize { --resize-edge: 6px; }
+.window-resize > div { position: fixed; z-index: 3; }
+[data-resize="North"], [data-resize="South"] { left: var(--resize-edge); right: var(--resize-edge); height: var(--resize-edge); cursor: ns-resize; }
+[data-resize="West"], [data-resize="East"] { top: var(--resize-edge); bottom: var(--resize-edge); width: var(--resize-edge); cursor: ew-resize; }
+[data-resize="North"], [data-resize^="North"] { top: 0; }
+[data-resize="South"], [data-resize^="South"] { bottom: 0; }
+[data-resize="West"], [data-resize$="West"] { left: 0; }
+[data-resize="East"], [data-resize$="East"] { right: 0; }
+:is([data-resize="NorthEast"], [data-resize="NorthWest"], [data-resize="SouthEast"], [data-resize="SouthWest"]) { width: var(--resize-edge); height: var(--resize-edge); }
+:is([data-resize="NorthEast"], [data-resize="SouthWest"]) { cursor: nesw-resize; }
+:is([data-resize="NorthWest"], [data-resize="SouthEast"]) { cursor: nwse-resize; }
 #agent { padding: 0 15px; }
 kbd { font: inherit; font-size: 12px; white-space: nowrap; }
 #home { min-height: calc(100vh - 53px); background: url('assets/composicaoobliqua.svg') right 7px no-repeat; }
@@ -70,11 +81,12 @@ dialog p { color: var(--muted); }
 #query, #tab-filter { background: var(--graphite); border: 1px solid #4b4337; border-radius: 8px; padding: 12px; min-width: 0; }
 .primary { background: var(--accent); color: var(--night); }
 .primary:hover { background: #e5ff9b; }
-#tab-dialog { margin: 63px 0 0 12px; width: 320px; max-height: calc(100dvh - 75px); }
+#tab-dialog { margin: 63px 0 0 12px; width: 355px; max-height: calc(100dvh - 75px); }
 #tab-filter { width: 100%; margin-top: 12px; }
 .dialog-heading, .dialog-actions, #tab-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h2 { font-size: 18px; margin: 0; }
 #tab-list { padding: 0; list-style: none; overflow-y: auto; max-height: max(120px, calc(100dvh - 300px)); }
 #tab-list li button:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 #tab-list [aria-current=true] { background: var(--graphite); color: var(--accent); }
+#tab-list [data-pinned="true"] [data-pin] { color: var(--accent); }
 #status { position: fixed; bottom: 18px; left: 18px; z-index: 1; background: var(--toolbar); padding: 12px; border: 1px solid #4b4337; }

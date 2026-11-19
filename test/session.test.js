@@ -54,3 +54,14 @@ test('restorable addresses exclude local app origins, credentials and unsupporte
   ]) assert.equal(websiteAddress(value), '');
   assert.equal(websiteAddress('https://[::1]:8080/?q=a#b'), 'https://[::1]:8080/?q=a#b');
 });
+
+test('restores pins for valid pages and leaves older sessions unpinned', () => {
+  const tabs = ['https://example.org/', '', 'https://example.com/'];
+  assert.equal(readSession(JSON.stringify({ tabs })).pinnedIndices.size, 0);
+  const session = readSession(JSON.stringify({
+    tabs, activeIndex: 2, pinnedIndices: [2, 0, 2, 1, -1, 3, '0', null],
+  }));
+  assert.deepEqual([...session.pinnedIndices], [2, 0]);
+  assert.deepEqual(session.tabs, tabs);
+  assert.equal(session.activeIndex, 2);
+});
