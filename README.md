@@ -19,7 +19,7 @@ Em um ambiente de desenvolvimento Windows x64, execute `npm ci` e `npm run build
 
 O instalador configura o Orla para o usuário atual e usa a internet para obter o WebView2 caso o runtime esteja ausente. Os builds de teste são gerados sem assinatura de código.
 
-No GitHub Actions, o workflow **Windows installer** executa os testes JavaScript, gera o instalador, instala o Orla em uma pasta temporária e verifica se a janela abre. Após uma execução bem-sucedida, baixe o instalador no artefato **orla-browser-windows-x64**.
+No GitHub Actions, o workflow **Windows validation** executa os testes JavaScript e verifica o código Rust nos PRs. Quando for hora de empacotar uma entrega, uma execução manual do workflow gera o instalador, verifica se ele instala e abre o Orla e disponibiliza o artefato **orla-browser-windows-x64**.
 
 ## Primeiro recorte
 
