@@ -13,6 +13,14 @@ npm run dev
 
 `npm run build` compila o executável sem empacotar um instalador. `npm run check` valida os scripts e as regras de interpretação da barra de endereço.
 
+## Instalador do Windows
+
+Em um ambiente de desenvolvimento Windows x64, execute `npm ci` e `npm run build:installer`. O Tauri gera o instalador NSIS em `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`.
+
+O instalador configura o Orla para o usuário atual e usa a internet para obter o WebView2 caso o runtime esteja ausente. Os builds de teste são gerados sem assinatura de código.
+
+No GitHub Actions, o workflow **Windows installer** executa os testes JavaScript, gera o instalador, instala o Orla em uma pasta temporária e verifica se a janela abre. Após uma execução bem-sucedida, baixe o instalador no artefato **orla-browser-windows-x64**.
+
 ## Primeiro recorte
 
 - Nova aba com favoritos de início e interface baseada no [Figma V3](https://www.figma.com/design/z0VTjnV3KAlis2UDNxif9b?node-id=15-29).

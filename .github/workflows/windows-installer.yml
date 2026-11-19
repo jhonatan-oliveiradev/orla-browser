@@ -1,0 +1,77 @@
+name: Windows installer
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: stable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check frontend
+        run: npm run check
+      - name: Prepare Rust target
+        run: rustup target add x86_64-pc-windows-msvc
+      - name: Build installer
+        run: npm run build:installer
+      - name: Install and launch Orla
+        shell: pwsh
+        run: |
+          $bundleDir = 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis'
+          $installers = @(Get-ChildItem -Path $bundleDir -Filter '*-setup.exe' -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected one Windows installer, found $($installers.Count)."
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP 'Orla Browser smoke'
+          $setup = Start-Process -FilePath $installers[0].FullName -ArgumentList "/S /D=$installDir" -Wait -PassThru
+          if ($setup.ExitCode -ne 0) {
+            throw "Installer exited with code $($setup.ExitCode)."
+          }
+
+          $appPath = Join-Path $installDir 'orla-browser.exe'
+          $app = Start-Process -FilePath $appPath -PassThru
+          try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(45)
+            do {
+              $app.Refresh()
+              if ($app.HasExited) {
+                throw "Orla exited on startup with code $($app.ExitCode)."
+              }
+              if ($app.MainWindowTitle -eq 'Orla Browser') {
+                Write-Host 'Orla Browser window opened.'
+                return
+              }
+              Start-Sleep -Seconds 1
+            } while ([DateTime]::UtcNow -lt $deadline)
+            throw 'Orla Browser window did not open within 45 seconds.'
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+          }
+      - name: Upload verified installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orla-browser-windows-x64
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 7
