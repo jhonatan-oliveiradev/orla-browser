@@ -16,7 +16,7 @@ button { border: 0; background: transparent; cursor: pointer; }
 button:hover { background: #3c372d; }
 button:disabled { opacity: .42; cursor: default; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.toolbar, .navigation, .window-actions, .address { display: flex; align-items: center; }
+.toolbar, .navigation, .address { display: flex; align-items: center; }
 .toolbar { position: sticky; top: 0; z-index: 2; height: 53px; gap: 9px; padding: 0 18px; background: var(--toolbar); user-select: none; }
 .toolbar > #tabs-toggle { margin-right: 15px; }
 .toolbar button { min-height: 32px; border-radius: 6px; }
@@ -27,9 +27,6 @@ button:disabled { opacity: .42; cursor: default; }
 .address { gap: 10px; background: var(--graphite); text-align: left; min-width: 0; }
 .toolbar .address { flex: 1; padding: 0 13px; border-radius: 16px; color: var(--muted); }
 .address span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.window-actions { gap: 6px; }
-.window-grip { flex: 0 0 38px; height: 100%; display: grid; place-items: center; cursor: grab; }
-.window-grip::before { content: ''; width: 16px; height: 9px; opacity: .7; pointer-events: none; background: radial-gradient(circle, var(--muted) 1px, transparent 1.5px) 0 0 / 5px 4px; }
 #agent { padding: 0 15px; }
 kbd { font: inherit; font-size: 12px; white-space: nowrap; }
 #home { min-height: calc(100vh - 53px); background: url('assets/composicaoobliqua.svg') right 7px no-repeat; }

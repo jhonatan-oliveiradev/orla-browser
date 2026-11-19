@@ -49,6 +49,18 @@ jobs:
             throw "Installer exited with code $($setup.ExitCode)."
           }
 
+          Add-Type @'
+          using System;
+          using System.Runtime.InteropServices;
+
+          public static class OrlaWindowFrame {
+              [DllImport("user32.dll", EntryPoint = "GetWindowLongW", ExactSpelling = true)]
+              public static extern int GetWindowLong(IntPtr window, int index);
+              public const int StyleIndex = -16; // GWL_STYLE
+              public const int NativeFrame = 0x00CF0000; // WS_OVERLAPPEDWINDOW
+          }
+          '@
+
           $appPath = Join-Path $installDir 'orla-browser.exe'
           $app = Start-Process -FilePath $appPath -PassThru
           try {
@@ -59,7 +71,12 @@ jobs:
                 throw "Orla exited on startup with code $($app.ExitCode)."
               }
               if ($app.MainWindowTitle -eq 'Orla Browser') {
-                Write-Host 'Orla Browser window opened.'
+                $style = [OrlaWindowFrame]::GetWindowLong($app.MainWindowHandle, [OrlaWindowFrame]::StyleIndex)
+                $nativeFrame = [OrlaWindowFrame]::NativeFrame
+                if (($style -band $nativeFrame) -ne $nativeFrame) {
+                  throw ('Orla opened without a standard resizable Windows frame. Style: 0x{0:X8}.' -f $style)
+                }
+                Write-Host 'Orla Browser opened with the native resizable Windows frame.'
                 return
               }
               Start-Sleep -Seconds 1

@@ -8,7 +8,7 @@
   <script type="module" src="browser.js"></script>
 </head>
 <body>
-  <header class="toolbar" aria-label="Navegação" data-tauri-drag-region>
+  <header class="toolbar" aria-label="Navegação">
     <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-dialog" aria-haspopup="dialog"><img src="assets/tabs.svg" alt=""></button>
     <div class="navigation">
       <button class="icon" data-tab-action="back" aria-label="Voltar"><img src="assets/back.svg" alt=""></button>
@@ -19,12 +19,6 @@
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
-    <div class="window-grip" data-tauri-drag-region title="Arraste para mover a janela" aria-hidden="true"></div>
-    <div class="window-actions" aria-label="Controles da janela">
-      <button class="icon" data-window-action="minimize" aria-label="Minimizar"><img src="assets/min.svg" alt=""></button>
-      <button class="icon" data-window-action="maximize" aria-label="Maximizar ou restaurar"><img src="assets/max.svg" alt=""></button>
-      <button class="icon" data-window-action="close" aria-label="Fechar janela"><img src="assets/close.svg" alt=""></button>
-    </div>
   </header>
   <main id="home">
     <div class="home-nav" role="tablist" aria-label="Nova aba">

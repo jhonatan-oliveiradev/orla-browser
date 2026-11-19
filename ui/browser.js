@@ -281,9 +281,6 @@ favoriteButton.addEventListener('click', () => {
 for (const button of document.querySelectorAll('[data-tab-action]')) {
   button.addEventListener('click', () => schedule(() => invoke('tab_action', { id: activeId, action: button.dataset.tabAction })));
 }
-for (const button of document.querySelectorAll('[data-window-action]')) {
-  button.addEventListener('click', () => schedule(() => invoke('window_action', { action: button.dataset.windowAction })));
-}
 byId('search-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const value = query.value;

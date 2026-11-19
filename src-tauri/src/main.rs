@@ -126,28 +126,13 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
     .map_err(as_message)
 }
 
-#[tauri::command]
-async fn window_action(caller: Webview, app: AppHandle, action: String) -> CommandResult {
-    ui_only(&caller)?;
-    let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
-    match action.as_str() {
-        "minimize" => window.minimize(),
-        "maximize" if window.is_maximized().map_err(as_message)? => window.unmaximize(),
-        "maximize" => window.maximize(),
-        "close" => window.close(),
-        _ => return Err("Ação de janela inválida.".into()),
-    }
-    .map_err(as_message)
-}
-
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             navigate_tab,
             show_tab,
             resize_tabs,
-            tab_action,
-            window_action
+            tab_action
         ])
         .run(tauri::generate_context!())
         .expect("Não foi possível iniciar o Orla Browser");
