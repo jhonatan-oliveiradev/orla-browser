@@ -1,4 +1,6 @@
 import { duckDuckGo, resolveNavigation } from './address.js';
+import { initDownloads } from './downloads.js';
+import { initOffline } from './offline.js';
 import { initAppearance } from './appearance.js';
 import { addVisit, HISTORY_KEY, matchesPage, pageTitle, readHistory, suggestPages } from './history.js';
 import { initOmnibox } from './omnibox.js';
@@ -15,6 +17,8 @@ const status = byId('status');
 const homeSearch = byId('home-search');
 const providerInput = byId('search-provider-url');
 const providerDialog = byId('search-provider-dialog');
+const providerStatus = byId('provider-status');
+let providerTestRequest = 0;
 const stage = byId('site-viewport');
 const historyFilter = byId('history-filter');
 const historyList = byId('history-list');
@@ -86,10 +90,14 @@ function saveSession() {
   }
 }
 
+const showOffline = initOffline();
+const downloads = initDownloads(invoke);
+
 function render() {
   const tab = tabs.get(activeId);
   if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
   home.hidden = tab.loaded || Boolean(tab.webSearch);
+  showOffline(tab.failure);
   webSearch.render(tab.webSearch);
   for (const button of document.querySelectorAll('[data-tab-action]')) {
     button.disabled = !tab.loaded;
@@ -321,13 +329,20 @@ async function syncView(focusTabId) {
   if (!home.hidden && !byId('home-resume').hidden) renderResume();
   if (!tauri) return;
   const tab = tabs.get(activeId);
-  if (!tab.url || document.querySelector('dialog[open]')) {
-    await invoke('show_tab', { id: null });
+  if (!tab.url || tab.failure || document.querySelector('dialog[open]')) {
+    await invoke('show_tab', { id: null, focus: Boolean(tab.failure) });
     return;
   }
   if (!tab.loaded) {
     await invoke('show_tab', { id: null });
-    await invoke('navigate_tab', { id: activeId, address: tab.url, ...stagePosition() });
+    try {
+      await invoke('navigate_tab', { id: activeId, address: tab.url, ...stagePosition() });
+    } catch {
+      tab.failure = 'navigation';
+      tab.loaded = true;
+      render();
+      return;
+    }
     tab.loaded = true;
     render();
   }
@@ -342,7 +357,12 @@ async function go(url) {
 
   const id = activeId;
   const tab = tabs.get(id);
-  await invoke('navigate_tab', { id, address: target, ...stagePosition() });
+  try {
+    await invoke('navigate_tab', { id, address: target, ...stagePosition() });
+    delete tab.failure;
+  } catch {
+    tab.failure = 'navigation';
+  }
   if (tab.url !== target) tab.title = '';
   tab.url = target;
   delete tab.webSearch;
@@ -385,6 +405,8 @@ for (const dialog of document.querySelectorAll('dialog')) {
 for (const button of document.querySelectorAll('[data-dismiss]')) {
   button.addEventListener('click', () => button.closest('dialog').close());
 }
+byId('downloads-toggle').addEventListener('click', () => openDialog(byId('downloads-dialog')));
+byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeId).url)));
 byId('appearance').addEventListener('click', () => openDialog(byId('appearance-dialog')));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
@@ -455,10 +477,30 @@ byId('search-fallback').addEventListener('click', () => {
   const query = tabs.get(activeId).webSearch?.query;
   if (query) schedule(() => openTab(duckDuckGo(query)));
 });
-byId('search-provider-toggle').addEventListener('click', () => {
+function openProviderSettings() {
+  providerTestRequest++;
+  providerStatus.textContent = '';
   providerInput.setCustomValidity('');
   providerInput.value = searchProvider;
   openDialog(providerDialog);
+}
+
+byId('search-provider-toggle').addEventListener('click', openProviderSettings);
+byId('settings-search').addEventListener('click', () => {
+  byId('appearance-dialog').close();
+  openProviderSettings();
+});
+byId('provider-test').addEventListener('click', async () => {
+  const token = ++providerTestRequest;
+  try {
+    const provider = providerAddress(providerInput.value);
+    if (!provider) throw new Error('Informe o endereço da instância para testar a conexão.');
+    providerStatus.textContent = 'Testando a conexão…';
+    await invoke('search_web', { provider, query: 'Orla' });
+    if (token === providerTestRequest) providerStatus.textContent = 'A conexão funcionou e o provedor retornou JSON.';
+  } catch (error) {
+    if (token === providerTestRequest) providerStatus.textContent = String(error.message ?? error);
+  }
 });
 byId('search-provider-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -474,7 +516,11 @@ byId('search-provider-form').addEventListener('submit', (event) => {
   const state = tabs.get(activeId).webSearch;
   if (state) webSearch.run(state, searchProvider);
 });
-providerInput.addEventListener('input', () => providerInput.setCustomValidity(''));
+providerInput.addEventListener('input', () => {
+  providerInput.setCustomValidity('');
+  providerTestRequest++;
+  providerStatus.textContent = '';
+});
 
 const omnibox = initOmnibox({
   input: address,
@@ -565,7 +611,7 @@ render();
 refreshTabList();
 if (tauri) {
   schedule(async () => {
-    await tauri.event.listen('orla-location', ({ payload }) => schedule(() => {
+    await tauri.event.listen('orla-location', ({ payload }) => schedule(async () => {
       const id = Number(payload.id.slice(4));
       const tab = tabs.get(id);
       const url = websiteAddress(payload.url);
@@ -576,6 +622,15 @@ if (tauri) {
         saveSession();
         if (id === activeId) render();
         refreshTabList();
+      }
+      if (payload.failure) {
+        tab.failure = payload.failure;
+        tab.loaded = true;
+        if (id === activeId) {
+          await syncView();
+          byId('offline-retry').focus();
+        }
+        return;
       }
       if (payload.finished) {
         tab.visit = addVisit(history, url, tab.title);
@@ -596,6 +651,12 @@ if (tauri) {
         saveHistory();
       }
     }));
+    await tauri.event.listen('orla-new-tab', ({ payload }) => {
+      const url = websiteAddress(payload);
+      if (url) schedule(() => openTab(url));
+    });
+    await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
+    await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();
   });

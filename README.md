@@ -34,4 +34,6 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - A barra sugere abas abertas, favoritos e visitas locais. O painel **Retomar** inclui as últimas 500 visitas, com filtro e opções de apagar uma visita ou limpar tudo.
 - Digite uma pesquisa na barra ou na Nova Aba para abrir a **Busca do Orla**. Em **Configurar provedor**, informe o endereço de uma instância SearXNG com JSON ativado em `search.formats`. O Orla envia apenas a consulta confirmada e oferece o DuckDuckGo como ação separada. Um provedor HTTPS remoto ou uma instância HTTP no próprio computador são aceitos. O Orla não inclui uma instância SearXNG hospedada.
 - O painel Agente é apenas informativo. A interface local tem permissões próprias e os webviews de sites não recebem acesso aos comandos do aplicativo.
-- Pop-ups são bloqueados. Permissões WebView2 adicionais ficam para uma rodada posterior.
+- Links HTTP(S) que pedem uma nova janela em resposta a uma ação do usuário abrem uma aba. Pop-ups automáticos continuam bloqueados. A lista de downloads da sessão permite acompanhar, cancelar e localizar arquivos concluídos.
+- Quando a navegação falhar, a aba mostra **Tentar novamente** e o jogo offline **Sinal de Volta**. Use Espaço, seta para cima ou toque para saltar e coletar sinais. O recorde fica no dispositivo.
+- Em **Tema → Provedor de busca** você pode testar uma instância SearXNG antes de salvá-la. O teste envia a consulta padrão `Orla`.

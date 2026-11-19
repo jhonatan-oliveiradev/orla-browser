@@ -13,4 +13,5 @@ tauri = { version = "2", features = ["unstable"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.39.1"
+windows-core = "0.62"
 windows-sys = { version = "0.61", features = ["Win32_Networking_WinHttp", "Win32_UI_Input_KeyboardAndMouse"] }

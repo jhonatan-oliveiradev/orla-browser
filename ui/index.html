@@ -23,6 +23,7 @@
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
     <button id="appearance" type="button" aria-haspopup="dialog" aria-controls="appearance-dialog">Tema</button>
+    <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog"><span aria-hidden="true">↓</span></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
@@ -117,6 +118,24 @@
             </section>
           </section>
         </main>
+        <section id="offline-view" class="offline-view" aria-labelledby="offline-heading" hidden>
+          <header class="offline-header">
+            <div><h1 id="offline-heading">Sem conexão</h1><p>Confira a conexão ou tente carregar a página novamente.</p></div>
+            <button id="offline-retry" type="button">Tentar novamente</button>
+          </header>
+          <div class="arcade">
+            <div class="arcade-hud">
+              <h2>Sinal de Volta</h2>
+              <p>Pontos <output id="offline-score">0</output> · Recorde <output id="offline-record">0</output></p>
+            </div>
+            <canvas id="offline-game" width="540" height="184" tabindex="0" aria-label="Sinal de Volta" aria-describedby="offline-controls"></canvas>
+            <div class="arcade-controls">
+              <button id="offline-play" type="button">Jogar</button>
+              <p id="offline-controls">Use Espaço, ↑ ou toque no jogo para saltar.</p>
+            </div>
+            <p id="offline-message" role="status"></p>
+          </div>
+        </section>
         <section id="web-search" class="home-workspace web-search" aria-labelledby="web-search-heading" hidden>
           <h1 id="web-search-heading">Busca do Orla</h1>
           <form id="web-search-form" class="address featured">
@@ -145,13 +164,22 @@
     <div data-resize="NorthWest"></div>
   </div>
   <p id="status" role="status" hidden></p>
+  <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
+    <h2 id="downloads-heading">Downloads</h2>
+    <p id="downloads-empty">Os arquivos baixados nesta sessão aparecem aqui.</p>
+    <p id="downloads-error" role="status"></p>
+    <ul id="downloads-list"></ul>
+    <button type="button" data-dismiss>Fechar</button>
+  </dialog>
   <dialog id="search-provider-dialog" aria-labelledby="search-provider-heading">
     <h2 id="search-provider-heading">Provedor de busca</h2>
     <form id="search-provider-form">
       <label for="search-provider-url">Endereço da instância SearXNG</label>
       <input id="search-provider-url" type="url" placeholder="https://busca.exemplo.com" maxlength="500" autocomplete="off" spellcheck="false">
       <p>A instância precisa aceitar resultados em JSON. Ela só recebe a pesquisa enviada.</p>
-      <button type="submit">Salvar e pesquisar</button>
+      <p id="provider-status" role="status"></p>
+      <button id="provider-test" type="button">Testar conexão</button>
+      <button type="submit">Salvar provedor</button>
       <button type="button" data-dismiss>Cancelar</button>
     </form>
   </dialog>
@@ -164,6 +192,7 @@
       <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span> Areia</label>
     </fieldset>
     <label class="motion-option"><input id="appearance-motion" type="checkbox" checked> Animar fundo da Nova Aba</label>
+    <button id="settings-search" type="button">Provedor de busca</button>
     <button type="button" data-dismiss>Fechar</button>
   </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">

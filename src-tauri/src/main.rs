@@ -2,11 +2,13 @@
 
 #[cfg(windows)]
 mod shortcuts;
+#[cfg(windows)]
+mod site_events;
 mod search;
 
 use serde::Serialize;
 use tauri::{
-    webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
+    webview::{NewWindowResponse, WebviewBuilder},
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Url, Webview, WebviewUrl,
 };
 
@@ -16,13 +18,6 @@ const TOOLBAR: f64 = 53.0;
 const RESIZE_EDGE: f64 = 6.0;
 
 type CommandResult = Result<(), String>;
-
-#[derive(Clone, Serialize)]
-struct TabLocation {
-    id: String,
-    url: String,
-    finished: bool,
-}
 
 #[derive(Clone, Serialize)]
 struct TabTitle {
@@ -89,20 +84,9 @@ async fn navigate_tab(
         .map_err(as_message)?
         .to_logical::<f64>(scale);
     let (position, size) = site_bounds(size.width, size.height, sidebar_left, site_top);
-    let builder = WebviewBuilder::new(label, WebviewUrl::External(url))
+    let builder = WebviewBuilder::new(label, WebviewUrl::External(Url::parse("about:blank").unwrap()))
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
-        .on_page_load(|view, page| {
-            let _ = view.app_handle().emit_to(
-                SHELL,
-                "orla-location",
-                TabLocation {
-                    id: view.label().to_owned(),
-                    url: page.url().to_string(),
-                    finished: matches!(page.event(), PageLoadEvent::Finished),
-                },
-            );
-        })
         .on_document_title_changed(|view, title| {
             if let Ok(url) = view.url() {
                 let _ = view.app_handle().emit_to(
@@ -118,8 +102,11 @@ async fn navigate_tab(
         });
     let view = window.add_child(builder, position, size).map_err(as_message)?;
     #[cfg(windows)]
-    shortcuts::attach(&view)?;
-    Ok(())
+    {
+        shortcuts::attach(&view)?;
+        site_events::attach(&view)?;
+    }
+    view.navigate(url).map_err(as_message)
 }
 
 #[tauri::command]
@@ -131,6 +118,11 @@ async fn show_tab(
     for (label, view) in app.webviews() {
         if label.starts_with("tab-") && Some(&label) != active.as_ref() {
             view.hide().map_err(as_message)?;
+        }
+    }
+    if id.is_none() && focus == Some(true) {
+        if let Some(shell) = app.get_webview(SHELL) {
+            shell.set_focus().map_err(as_message)?;
         }
     }
     if let Some(view) = active.and_then(|label| app.get_webview(&label)) {
@@ -173,6 +165,15 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
     .map_err(as_message)
 }
 
+#[cfg(not(windows))]
+mod site_events {
+    #[tauri::command]
+    pub fn download_action(id: u32, action: String) -> super::CommandResult {
+        let _ = (id, action);
+        Err("Downloads estão disponíveis no Windows.".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -180,6 +181,7 @@ fn main() {
             show_tab,
             resize_tabs,
             tab_action,
+            site_events::download_action,
             search::search_web
         ])
         .run(tauri::generate_context!())

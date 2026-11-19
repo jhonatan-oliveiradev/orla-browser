@@ -215,3 +215,28 @@ h2 { font-size: 18px; margin: 0; }
 #search-provider-dialog { width: 390px; }
 #search-provider-form { margin-top: 15px; }
 #search-provider-url { display: block; width: 100%; margin-top: 8px; padding: 8px; border-radius: 6px; background: var(--graphite); border: 1px solid var(--line); }
+
+.offline-view { min-height: 100%; padding: clamp(16px, 5cqw, 48px); background: #f9edf4; color: #32162b; }
+.offline-header { display: flex; align-items: end; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-inline: auto; max-width: 760px; }
+.offline-header h1 { font: 800 clamp(24px, 5cqw, 42px)/1.05 ui-monospace, Consolas, monospace; margin: 0; }
+.offline-header p { margin: 8px 0 0; line-height: 1.5; }
+.offline-view button { background: #c91b76; color: #fff; font-weight: 700; padding: 9px 12px; border: 2px solid #3c1734; }
+.offline-view button:hover { background: #a70d5d; }
+.offline-view :focus-visible { outline-color: #861554; }
+.arcade { max-width: 760px; margin: 22px auto 0; border: 2px solid #3c1734; background: #fdd8ec; box-shadow: 5px 5px 0 #dd63a3; }
+.arcade-hud, .arcade-controls { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.arcade-hud { border-bottom: 2px solid #3c1734; background: #ffe7f5; font: 600 13px ui-monospace, Consolas, monospace; }
+.arcade-hud h2 { font-size: 16px; letter-spacing: -.035em; }
+.arcade-hud p, .arcade-controls p { margin: 0; }
+#offline-game { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #ffe9f4; }
+.arcade-controls { border-top: 2px solid #3c1734; font-size: 13px; }
+#offline-message { margin: 0; padding: 0 12px 9px; font-size: 13px; }
+#offline-message:empty { display: none; }
+#downloads-toggle { font-size: 20px; }
+#downloads-dialog { width: 440px; }
+#downloads-list { list-style: none; padding: 0; max-height: 50vh; overflow: auto; }
+#downloads-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+#downloads-list strong { overflow-wrap: anywhere; }
+#downloads-list small { color: var(--muted); }
+#downloads-list progress { width: 100%; grid-column: 1 / -1; accent-color: var(--accent); }
+#downloads-list button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
