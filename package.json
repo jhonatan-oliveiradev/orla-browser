@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build --no-bundle",
+    "build:installer": "tauri build --ci --target x86_64-pc-windows-msvc -- --locked",
     "check": "node --check ui/browser.js && node --test"
   },
   "devDependencies": {
