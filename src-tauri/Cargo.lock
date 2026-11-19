@@ -2183,8 +2183,11 @@ name = "orla-browser"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
+ "webview2-com",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

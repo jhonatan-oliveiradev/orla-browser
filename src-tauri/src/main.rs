@@ -1,8 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod shortcuts;
+mod search;
+
 use serde::Serialize;
 use tauri::{
-    webview::{NewWindowResponse, WebviewBuilder},
+    webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Url, Webview, WebviewUrl,
 };
 
@@ -17,6 +21,14 @@ type CommandResult = Result<(), String>;
 struct TabLocation {
     id: String,
     url: String,
+    finished: bool,
+}
+
+#[derive(Clone, Serialize)]
+struct TabTitle {
+    id: String,
+    url: String,
+    title: String,
 }
 
 fn ui_only(caller: &Webview) -> CommandResult {
@@ -39,13 +51,16 @@ fn as_message(error: tauri::Error) -> String {
     error.to_string()
 }
 
-fn site_bounds(width: f64, height: f64, sidebar_left: f64) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+fn site_bounds(
+    width: f64, height: f64, sidebar_left: f64, site_top: f64,
+) -> (LogicalPosition<f64>, LogicalSize<f64>) {
     let left = sidebar_left.clamp(RESIZE_EDGE, (width - RESIZE_EDGE - 1.0).max(RESIZE_EDGE));
+    let top = site_top.clamp(TOOLBAR, (height - RESIZE_EDGE - 1.0).max(TOOLBAR));
     let size = LogicalSize::new(
         (width - left - RESIZE_EDGE).max(1.0),
-        (height - TOOLBAR - RESIZE_EDGE).max(1.0),
+        (height - top - RESIZE_EDGE).max(1.0),
     );
-    (LogicalPosition::new(left, TOOLBAR), size)
+    (LogicalPosition::new(left, top), size)
 }
 
 fn tab_label(id: u32) -> String {
@@ -54,7 +69,7 @@ fn tab_label(id: u32) -> String {
 
 #[tauri::command]
 async fn navigate_tab(
-    caller: Webview, app: AppHandle, id: u32, address: String, sidebar_left: f64,
+    caller: Webview, app: AppHandle, id: u32, address: String, sidebar_left: f64, site_top: f64,
 ) -> CommandResult {
     ui_only(&caller)?;
     let url = Url::parse(&address).map_err(|_| "Endereço inválido.".to_string())?;
@@ -73,7 +88,7 @@ async fn navigate_tab(
         .inner_size()
         .map_err(as_message)?
         .to_logical::<f64>(scale);
-    let (position, size) = site_bounds(size.width, size.height, sidebar_left);
+    let (position, size) = site_bounds(size.width, size.height, sidebar_left, site_top);
     let builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
@@ -84,13 +99,27 @@ async fn navigate_tab(
                 TabLocation {
                     id: view.label().to_owned(),
                     url: page.url().to_string(),
+                    finished: matches!(page.event(), PageLoadEvent::Finished),
                 },
             );
+        })
+        .on_document_title_changed(|view, title| {
+            if let Ok(url) = view.url() {
+                let _ = view.app_handle().emit_to(
+                    SHELL,
+                    "orla-title",
+                    TabTitle {
+                        id: view.label().to_owned(),
+                        url: url.to_string(),
+                        title,
+                    },
+                );
+            }
         });
-    window
-        .add_child(builder, position, size)
-        .map(|_| ())
-        .map_err(as_message)
+    let view = window.add_child(builder, position, size).map_err(as_message)?;
+    #[cfg(windows)]
+    shortcuts::attach(&view)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -115,10 +144,10 @@ async fn show_tab(
 
 #[tauri::command]
 async fn resize_tabs(
-    caller: Webview, app: AppHandle, width: f64, height: f64, sidebar_left: f64,
+    caller: Webview, app: AppHandle, width: f64, height: f64, sidebar_left: f64, site_top: f64,
 ) -> CommandResult {
     ui_only(&caller)?;
-    let (position, size) = site_bounds(width, height, sidebar_left);
+    let (position, size) = site_bounds(width, height, sidebar_left, site_top);
     let bounds = Rect { position: position.into(), size: size.into() };
     for (label, view) in app.webviews() {
         if label.starts_with("tab-") {
@@ -150,7 +179,8 @@ fn main() {
             navigate_tab,
             show_tab,
             resize_tabs,
-            tab_action
+            tab_action,
+            search::search_web
         ])
         .run(tauri::generate_context!())
         .expect("Não foi possível iniciar o Orla Browser");

@@ -30,7 +30,8 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - As abas ficam na lateral. Arraste o divisor ou use as setas do teclado para mudar a largura. O botão na barra de ferramentas recolhe a lateral para mostrar apenas a aba atual. A largura, o estado recolhido e as abas fixadas são restaurados quando você reabre o Orla.
 - Navegação HTTP(S) em webviews nativas e controles de histórico por aba. O Orla salva localmente os endereços e a aba selecionada. Ao reiniciar, carrega a aba selecionada e deixa as demais aguardando seleção. O histórico de voltar e avançar recomeça com cada nova execução.
 - O painel de abas permite buscar entre as abertas e reabrir a última aba fechada na execução atual. A estrela na barra adiciona ou remove páginas dos favoritos da nova aba.
-- Com foco na interface do Orla, use Ctrl+L para a barra de endereço, Ctrl+T para abrir aba, Ctrl+W para fechar e Ctrl+Shift+T para reabrir.
-- Digite um endereço ou uma pesquisa diretamente na barra superior ou no campo da Nova Aba e pressione Enter. As pesquisas abrem no DuckDuckGo. Morphic e o agente ainda não estão integrados.
+- No Windows, use Ctrl+L para focar a barra de endereço, Ctrl+T para abrir aba, Ctrl+W para fechar e Ctrl+Shift+T para reabrir, inclusive com foco dentro de um site. Use as setas e Enter para escolher sugestões locais.
+- A barra sugere abas abertas, favoritos e visitas locais. O painel **Retomar** inclui as últimas 500 visitas, com filtro e opções de apagar uma visita ou limpar tudo.
+- Digite uma pesquisa na barra ou na Nova Aba para abrir a **Busca do Orla**. Em **Configurar provedor**, informe o endereço de uma instância SearXNG com JSON ativado em `search.formats`. O Orla envia apenas a consulta confirmada e oferece o DuckDuckGo como ação separada. Um provedor HTTPS remoto ou uma instância HTTP no próprio computador são aceitos. O Orla não inclui uma instância SearXNG hospedada.
 - O painel Agente é apenas informativo. A interface local tem permissões próprias e os webviews de sites não recebem acesso aos comandos do aplicativo.
-- Pop-ups são bloqueados. Permissões WebView2 adicionais e atalhos com foco no site ficam para uma rodada posterior.
+- Pop-ups são bloqueados. Permissões WebView2 adicionais ficam para uma rodada posterior.

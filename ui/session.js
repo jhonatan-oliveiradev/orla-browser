@@ -51,5 +51,6 @@ export function readSession(serialized) {
     collapsed: saved?.sidebar?.collapsed === true,
   };
   const appearance = readAppearance(saved?.appearance);
-  return { tabs, activeIndex, favorites, pinnedIndices, sidebar, appearance };
+  const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
+  return { tabs, activeIndex, favorites, pinnedIndices, sidebar, appearance, searchProvider };
 }

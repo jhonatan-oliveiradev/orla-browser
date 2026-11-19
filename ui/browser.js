@@ -1,5 +1,8 @@
-import { resolveAddress } from './address.js';
+import { duckDuckGo, resolveNavigation } from './address.js';
 import { initAppearance } from './appearance.js';
+import { addVisit, HISTORY_KEY, matchesPage, pageTitle, readHistory, suggestPages } from './history.js';
+import { initOmnibox } from './omnibox.js';
+import { initWebSearch, providerAddress } from './web-search.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
 import { readSession, SESSION_KEY, websiteAddress } from './session.js';
@@ -10,7 +13,14 @@ const address = byId('address');
 const home = byId('home');
 const status = byId('status');
 const homeSearch = byId('home-search');
-const stage = byId('site-stage');
+const providerInput = byId('search-provider-url');
+const providerDialog = byId('search-provider-dialog');
+const stage = byId('site-viewport');
+const historyFilter = byId('history-filter');
+const historyList = byId('history-list');
+const historyClear = byId('history-clear');
+const historyConfirm = byId('history-confirm');
+const visitDate = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const tabFilter = byId('tab-filter');
 const tabList = byId('tab-list');
 const reopenButton = byId('reopen-tab');
@@ -18,19 +28,24 @@ const favoriteButton = byId('favorite-page');
 const recentlyClosed = [];
 
 let snapshot = null;
+let history = [];
 try {
-  if (tauri) snapshot = localStorage.getItem(SESSION_KEY);
+  if (tauri) {
+    snapshot = localStorage.getItem(SESSION_KEY);
+    history = readHistory(localStorage.getItem(HISTORY_KEY));
+  }
 } catch {
   // Navigation remains available if the WebView storage cannot be read.
 }
 const session = readSession(snapshot);
 const favorites = session.favorites;
 const tabs = new Map(session.tabs.map((url, id) => [id, {
-  url, loaded: false, pinned: session.pinnedIndices.has(id),
+  url, loaded: false, pinned: session.pinnedIndices.has(id), title: '',
 }]));
 let activeId = session.activeIndex;
 let sidebarSettings = session.sidebar;
 let appearance = session.appearance;
+let searchProvider = session.searchProvider;
 let addressDirty = false;
 let nextId = tabs.size;
 let pending = Promise.resolve();
@@ -62,6 +77,7 @@ function saveSession() {
       favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
       sidebar: sidebarSettings,
       appearance,
+      searchProvider,
     }));
     storageFailed = false;
   } catch {
@@ -72,8 +88,9 @@ function saveSession() {
 
 function render() {
   const tab = tabs.get(activeId);
-  if (!addressDirty) address.value = tab.url;
-  home.hidden = tab.loaded;
+  if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
+  home.hidden = tab.loaded || Boolean(tab.webSearch);
+  webSearch.render(tab.webSearch);
   for (const button of document.querySelectorAll('[data-tab-action]')) {
     button.disabled = !tab.loaded;
   }
@@ -100,14 +117,14 @@ function renderFavorites() {
   }
 }
 
-function resumeRow(url, activate) {
+function resumeRow(url, activate, title = '', date = null) {
   const row = document.createElement('li');
   const button = document.createElement('button');
   const host = document.createElement('strong');
   const detail = document.createElement('span');
   const address = new URL(url);
-  host.textContent = address.hostname;
-  detail.textContent = address.pathname + address.search + address.hash;
+  host.textContent = title || address.hostname;
+  detail.textContent = date ? visitDate.format(date) + ' · ' + address.hostname : address.pathname + address.search + address.hash;
   button.title = url;
   button.append(host, detail);
   button.addEventListener('click', () => schedule(activate));
@@ -126,29 +143,85 @@ function renderResume() {
   closed.replaceChildren();
   for (const [id, tab] of orderedTabs()) {
     if (!tab.url || id === activeId) continue;
-    open.append(resumeRow(tab.url, () => selectTab(id)));
+    open.append(resumeRow(tab.url, () => selectTab(id), tab.title));
   }
   for (let index = recentlyClosed.length - 1; index >= 0; index--) {
     const entry = recentlyClosed[index];
-    closed.append(resumeRow(entry.url, () => reopenTab(entry)));
+    closed.append(resumeRow(entry.url, () => reopenTab(entry), entry.title));
   }
   byId('resume-open-empty').hidden = open.childElementCount > 0;
   byId('resume-closed-empty').hidden = closed.childElementCount > 0;
+  renderHistory();
 }
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    showError('O Orla não conseguiu salvar o histórico neste dispositivo.');
+  }
+}
+
+function renderHistory() {
+  const empty = byId('history-empty');
+  const query = historyFilter.value.trim();
+  const entries = history.filter((entry) => matchesPage(query, entry.url, entry.title));
+  historyList.replaceChildren();
+  historyClear.disabled = !history.length;
+  if (!history.length) historyConfirm.hidden = true;
+  empty.hidden = entries.length > 0;
+  empty.textContent = query ? 'Nenhuma visita encontrada.' : 'As páginas visitadas aparecem aqui.';
+  for (const entry of entries) {
+    const row = resumeRow(entry.url, () => go(entry.url), entry.title, entry.visitedAt);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'delete-visit';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Apagar visita a ' + (entry.title || new URL(entry.url).hostname));
+    remove.addEventListener('click', () => {
+      history = history.filter((item) => item !== entry);
+      saveHistory();
+      renderHistory();
+      historyFilter.focus();
+    });
+    row.append(remove);
+    historyList.append(row);
+  }
+}
+
+historyFilter.addEventListener('input', renderHistory);
+historyClear.addEventListener('click', () => {
+  historyConfirm.hidden = false;
+  byId('history-cancel').focus();
+});
+byId('history-cancel').addEventListener('click', () => {
+  historyConfirm.hidden = true;
+  historyClear.focus();
+});
+byId('history-delete-all').addEventListener('click', () => {
+  history = [];
+  historyConfirm.hidden = true;
+  saveHistory();
+  renderHistory();
+  historyFilter.focus();
+});
 
 const resetHome = initHome(renderResume);
 
 function showCurrentAddress() {
   addressDirty = false;
   address.setCustomValidity('');
-  address.value = tabs.get(activeId).url;
+  const tab = tabs.get(activeId);
+  address.value = tab.url || tab.webSearch?.query || '';
 }
 
-function sidebarOffset() {
-  return stage.getBoundingClientRect().left;
+function stagePosition() {
+  const { left, top } = stage.getBoundingClientRect();
+  return { sidebarLeft: left, siteTop: top };
 }
 
 async function selectTab(id) {
+  omnibox.close();
   if (!tabs.has(id)) return;
   if (id !== activeId) {
     activeId = id;
@@ -164,7 +237,7 @@ async function closeTab(id) {
   if (tab.loaded) await invoke('tab_action', { id, action: 'close' });
 
   if (tab.url) {
-    recentlyClosed.push({ url: tab.url, pinned: tab.pinned });
+    recentlyClosed.push({ url: tab.url, pinned: tab.pinned, title: tab.title });
     if (recentlyClosed.length > 20) recentlyClosed.shift();
   }
   const previousActive = activeId;
@@ -189,7 +262,7 @@ function refreshTabList() {
   const filter = sidebarSettings.collapsed ? '' : (tabFilter.value || '').trim().toLocaleLowerCase('pt-BR');
   for (const [id, tab] of orderedTabs()) {
     if (sidebarSettings.collapsed && id !== activeId) continue;
-    const title = tab.url ? new URL(tab.url).hostname : 'Nova aba';
+    const title = tab.url ? tab.title || new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba';
     if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter)
       && !tab.url.toLowerCase().includes(filter)) continue;
 
@@ -239,7 +312,7 @@ function refreshTabList() {
 
 function createTab(url = '', pinned = false) {
   activeId = nextId++;
-  tabs.set(activeId, { url, loaded: false, pinned });
+  tabs.set(activeId, { url, loaded: false, pinned, title: '' });
 }
 
 async function syncView(focusTabId) {
@@ -254,7 +327,7 @@ async function syncView(focusTabId) {
   }
   if (!tab.loaded) {
     await invoke('show_tab', { id: null });
-    await invoke('navigate_tab', { id: activeId, address: tab.url, sidebarLeft: sidebarOffset() });
+    await invoke('navigate_tab', { id: activeId, address: tab.url, ...stagePosition() });
     tab.loaded = true;
     render();
   }
@@ -263,13 +336,16 @@ async function syncView(focusTabId) {
 
 async function go(url) {
   status.hidden = true;
+  omnibox.close();
   const target = websiteAddress(url);
   if (!target) throw new Error('Use um endereço HTTP ou HTTPS válido, sem credenciais.');
 
   const id = activeId;
   const tab = tabs.get(id);
-  await invoke('navigate_tab', { id, address: target, sidebarLeft: sidebarOffset() });
+  await invoke('navigate_tab', { id, address: target, ...stagePosition() });
+  if (tab.url !== target) tab.title = '';
   tab.url = target;
+  delete tab.webSearch;
   tab.loaded = true;
   showCurrentAddress();
   homeSearch.value = '';
@@ -280,12 +356,14 @@ async function go(url) {
 function openDialog(dialog) {
   schedule(async () => {
     if (document.querySelector('dialog[open]')) return;
+    omnibox.close();
     if (tauri) await invoke('show_tab', { id: null });
     dialog.showModal();
   });
 }
 
 async function openTab(url, pinned) {
+  omnibox.close();
   createTab(url, pinned);
   if (!url) resetHome();
   showCurrentAddress();
@@ -345,13 +423,76 @@ if (tauri?.window) {
     });
   }
 }
+const webSearch = initWebSearch({
+  invoke,
+  isActive: (state) => tabs.get(activeId).webSearch === state,
+  openResult: (url) => schedule(() => openTab(url)),
+});
+
+async function searchWeb(query) {
+  if (Array.from(query).length > 300) throw new Error('Digite uma pesquisa de até 300 caracteres.');
+  if (tabs.get(activeId).url) createTab();
+  const tab = tabs.get(activeId);
+  tab.webSearch = { query, results: [], status: '' };
+  showCurrentAddress();
+  homeSearch.value = '';
+  saveSession();
+  await syncView();
+  webSearch.run(tab.webSearch, searchProvider);
+}
+
+function submitNavigation(value) {
+  const destination = resolveNavigation(value);
+  return destination.url ? go(destination.url) : searchWeb(destination.query);
+}
+
+byId('web-search-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const query = byId('web-search-query').value.trim();
+  if (query) schedule(() => searchWeb(query));
+});
+byId('search-fallback').addEventListener('click', () => {
+  const query = tabs.get(activeId).webSearch?.query;
+  if (query) schedule(() => openTab(duckDuckGo(query)));
+});
+byId('search-provider-toggle').addEventListener('click', () => {
+  providerInput.setCustomValidity('');
+  providerInput.value = searchProvider;
+  openDialog(providerDialog);
+});
+byId('search-provider-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    searchProvider = providerAddress(providerInput.value);
+  } catch (error) {
+    providerInput.setCustomValidity(error.message);
+    providerInput.reportValidity();
+    return;
+  }
+  saveSession();
+  providerDialog.close();
+  const state = tabs.get(activeId).webSearch;
+  if (state) webSearch.run(state, searchProvider);
+});
+providerInput.addEventListener('input', () => providerInput.setCustomValidity(''));
+
+const omnibox = initOmnibox({
+  input: address,
+  list: byId('address-suggestions'),
+  search: (query) => suggestPages(query, { tabs, favorites, history, activeId }),
+  onSelect: (result) => schedule(() => result.kind === 'tab' ? selectTab(result.id) : go(result.url)),
+  onLayout: scheduleLayout,
+});
+
 for (const [form, input] of [[byId('address-form'), address], [byId('home-search-form'), homeSearch]]) {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (input === address && omnibox.submit()) return;
+    omnibox.close();
     const value = input.value;
     schedule(async () => {
       try {
-        await go(resolveAddress(value));
+        await submitNavigation(value);
       } catch (error) {
         input.setCustomValidity(String(error.message ?? error));
         input.reportValidity();
@@ -362,29 +503,32 @@ for (const [form, input] of [[byId('address-form'), address], [byId('home-search
 }
 address.addEventListener('input', () => { addressDirty = true; });
 address.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape') return;
+  if (event.key !== 'Escape' || event.defaultPrevented) return;
   showCurrentAddress();
   address.select();
 });
 
+function runShortcut(action) {
+  if (document.querySelector('dialog[open]')) return false;
+  switch (action) {
+    case 'address':
+      omnibox.close();
+      address.focus();
+      address.select();
+      return true;
+    case 'new-tab': schedule(() => openTab()); return true;
+    case 'reopen-tab': schedule(() => reopenTab()); return true;
+    case 'close-tab': schedule(() => closeTab(activeId)); return true;
+    default: return false;
+  }
+}
+
 document.addEventListener('keydown', (event) => {
-  if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
-  const key = event.key.toLowerCase();
-  if (key === 'l' && !event.shiftKey) {
-    event.preventDefault();
-    if (document.querySelector('dialog[open]')) return;
-    address.focus();
-    address.select();
-    return;
-  }
-  if (document.querySelector('dialog[open]')) return;
-  if (key === 't') {
-    event.preventDefault();
-    schedule(event.shiftKey ? reopenTab : () => openTab());
-  } else if (key === 'w' && !event.shiftKey) {
-    event.preventDefault();
-    schedule(() => closeTab(activeId));
-  }
+  if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat || event.isComposing) return;
+  const action = (event.shiftKey
+    ? { t: 'reopen-tab' }
+    : { l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
+  if (runShortcut(action)) event.preventDefault();
 });
 
 let resizeFrame;
@@ -394,7 +538,7 @@ function scheduleLayout() {
   resizeFrame = requestAnimationFrame(() => schedule(() => invoke('resize_tabs', {
     width: window.innerWidth,
     height: window.innerHeight,
-    sidebarLeft: sidebarOffset(),
+    ...stagePosition(),
   })));
 }
 
@@ -421,17 +565,38 @@ render();
 refreshTabList();
 if (tauri) {
   schedule(async () => {
-    await tauri.event.listen('orla-location', ({ payload }) => {
+    await tauri.event.listen('orla-location', ({ payload }) => schedule(() => {
       const id = Number(payload.id.slice(4));
       const tab = tabs.get(id);
       const url = websiteAddress(payload.url);
-      if (!tab || !url || url === tab.url) return;
-      tab.url = url;
-      saveSession();
-      if (id === activeId) render();
-      refreshTabList();
+      if (!tab || !url) return;
+      if (url !== tab.url) {
+        tab.url = url;
+        tab.title = tab.pendingTitle?.url === url ? tab.pendingTitle.title : '';
+        saveSession();
+        if (id === activeId) render();
+        refreshTabList();
+      }
+      if (payload.finished) {
+        tab.visit = addVisit(history, url, tab.title);
+        if (tab.visit) saveHistory();
+      }
       if (!home.hidden && !byId('home-resume').hidden) renderResume();
-    });
+    }));
+    await tauri.event.listen('orla-title', ({ payload }) => schedule(() => {
+      const tab = tabs.get(Number(payload.id.slice(4)));
+      const url = websiteAddress(payload.url);
+      const title = pageTitle(payload.title);
+      if (!tab || !url || !title) return;
+      tab.pendingTitle = { url, title };
+      if (tab.url !== url) return;
+      tab.title = title;
+      if (tab.visit?.url === url && history.includes(tab.visit)) {
+        tab.visit.title = title;
+        saveHistory();
+      }
+    }));
+    await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();
   });
   window.addEventListener('resize', scheduleLayout);
