@@ -16,6 +16,7 @@
       <button class="icon" data-tab-action="reload" aria-label="Recarregar"><img src="assets/reload.svg" alt=""></button>
     </div>
     <button id="address" class="address" aria-haspopup="dialog"><img src="assets/search.svg" alt=""><span>Pesquisar ou digitar endereço</span><kbd>Ctrl+L</kbd></button>
+    <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
     <div class="window-actions" aria-label="Controles da janela">
@@ -30,11 +31,8 @@
       <button id="home-search" class="address featured" aria-haspopup="dialog"><img src="assets/search.svg" alt="">Buscar na web <span aria-hidden="true">↵</span></button>
       <nav class="favorites" aria-label="Favoritos">
         <p>Favoritos</p>
-        <div>
-          <button data-url="https://github.com/">GitHub</button>
-          <button data-url="https://developer.mozilla.org/">MDN Web Docs</button>
-          <button data-url="https://www.figma.com/">Figma</button>
-        </div>
+        <div id="favorites-list"></div>
+        <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
       </nav>
     </div>
   </main>
@@ -50,8 +48,10 @@
   </dialog>
   <dialog id="tab-dialog" aria-labelledby="tab-heading">
     <div class="dialog-heading"><h2 id="tab-heading">Abas</h2><button id="add-tab">Nova aba</button></div>
+    <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off" autofocus>
     <ul id="tab-list"></ul>
-    <button data-dismiss>Fechar</button>
+    <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
+    <div class="dialog-actions"><button id="reopen-tab" disabled>Reabrir última aba</button><button data-dismiss>Fechar</button></div>
   </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">
     <h2 id="agent-heading">Agente</h2>
