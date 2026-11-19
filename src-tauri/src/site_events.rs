@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc, sync::atomic::{AtomicU32, Ordering}};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Webview};
+use tauri::{AppHandle, Emitter, Manager, Webview};
 use webview2_com::{
     Microsoft::Web::WebView2::Win32::*, take_pwstr, BytesReceivedChangedEventHandler,
     DownloadStartingEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
