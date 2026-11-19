@@ -4,11 +4,12 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Webview};
 use webview2_com::{
     Microsoft::Web::WebView2::Win32::*, take_pwstr, BytesReceivedChangedEventHandler,
+    CallDevToolsProtocolMethodCompletedHandler, ExecuteScriptCompletedHandler,
     DownloadStartingEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
     NewWindowRequestedEventHandler, StateChangedEventHandler,
 };
 
-use crate::{as_message, ui_only, website, CommandResult, SHELL};
+use crate::{as_message, ui_only, website, tab_label, CommandResult, SHELL};
 
 #[derive(Clone, Serialize)]
 struct Location {
@@ -17,6 +18,79 @@ struct Location {
     finished: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     failure: Option<&'static str>,
+}
+
+#[derive(serde::Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PageMetadata {
+    url: String,
+    title: String,
+    social_title: String,
+    description: String,
+}
+
+const READ_METADATA: &str = r#"(() => {
+    const read = (selector, limit) =>
+        (document.head?.querySelector(selector)?.getAttribute('content') || '').trim().slice(0, limit);
+    return {
+        url: location.href.slice(0, 8192),
+        title: document.title.trim().slice(0, 160),
+        socialTitle: read('meta[property="og:title"]', 160),
+        description: read('meta[property="og:description"]', 320) || read('meta[name="description"]', 320),
+    };
+})()"#;
+
+fn read_metadata(core: &ICoreWebView2, id: String, app: AppHandle) {
+    let callback = ExecuteScriptCompletedHandler::create(Box::new(move |status, json| {
+        status?;
+        if json.len() <= 32_000 {
+            if let Ok(page) = serde_json::from_str::<PageMetadata>(&json) {
+                if tauri::Url::parse(&page.url).is_ok_and(|url| website(&url)) {
+                    let _ = app.emit_to(SHELL, "orla-page-metadata", serde_json::json!({ "id": id, "page": page }));
+                }
+            }
+        }
+        Ok(())
+    }));
+    let script = windows_core::HSTRING::from(READ_METADATA);
+    let _ = unsafe { core.ExecuteScript(&script, &callback) };
+}
+
+#[tauri::command]
+pub async fn tab_preview(
+    caller: Webview, app: AppHandle, id: u32, width: u32, height: u32,
+) -> CommandResult {
+    ui_only(&caller)?;
+    let Some(view) = app.get_webview(&tab_label(id)) else { return Ok(()) };
+    let url = view.url().map_err(as_message)?;
+    if !website(&url) || width < 2 || height < 2 { return Ok(()) }
+    let width = width.min(1440);
+    let height = height.min(900);
+    let scale = (360.0 / f64::from(width)).min(240.0 / f64::from(height)).min(1.0);
+    let options = serde_json::json!({
+        "format": "jpeg", "quality": 68,
+        "clip": { "x": 0, "y": 0, "width": width, "height": height, "scale": scale },
+        "captureBeyondViewport": false
+    }).to_string();
+    view.with_webview(move |platform| {
+        let Ok(core) = (unsafe { platform.controller().CoreWebView2() }) else { return };
+        let callback = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(move |status, json| {
+            status?;
+            if json.len() <= 400_000 {
+                if let Ok(result) = serde_json::from_str::<serde_json::Value>(&json) {
+                    if let Some(image) = result.get("data").and_then(|item| item.as_str()) {
+                        let _ = app.emit_to(SHELL, "orla-tab-preview", serde_json::json!({
+                            "id": id, "url": url.as_str(), "image": image,
+                        }));
+                    }
+                }
+            }
+            Ok(())
+        }));
+        let method = windows_core::w!("Page.captureScreenshot");
+        let options = windows_core::HSTRING::from(options);
+        let _ = unsafe { core.CallDevToolsProtocolMethod(method, &options, &callback) };
+    }).map_err(as_message)
 }
 
 #[derive(Clone, Serialize)]
@@ -74,7 +148,7 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
     };
     let end = {
         let app = app.clone();
-        NavigationCompletedEventHandler::create(Box::new(move |_, args| {
+        NavigationCompletedEventHandler::create(Box::new(move |sender, args| {
             let Some(args) = args else { return Ok(()) };
             let (expected, url) = latest.borrow().clone();
             let mut nav_id = 0;
@@ -96,6 +170,9 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
                 }
             };
             let _ = app.emit_to(SHELL, "orla-location", Location { id: id.clone(), url, finished: true, failure });
+            if failure.is_none() {
+                if let Some(core) = sender { read_metadata(&core, id.clone(), app.clone()); }
+            }
             Ok(())
         }))
     };
