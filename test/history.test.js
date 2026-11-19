@@ -24,6 +24,11 @@ test('deduplicates suggestions and prioritizes an open tab over a favorite or vi
     activeId: 10, favorites: new Map([[tab, 'GitHub']]), history,
   });
   assert.deepEqual(entries.map(({ kind, id }) => [kind, id]), [['tab', 9], ['history', undefined]]);
+  const [matchedAlias] = suggestPages('design kit', {
+    tabs: new Map([[9, { url: tab, title: 'GitHub' }]]),
+    activeId: 0, favorites: new Map([[tab, 'Design Kit']]), history,
+  });
+  assert.deepEqual([matchedAlias.kind, matchedAlias.id], ['tab', 9]);
   assert.equal(suggestPages(' ', { tabs: [], favorites: [], history }).length, 0);
 });
 

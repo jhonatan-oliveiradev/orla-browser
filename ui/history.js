@@ -58,18 +58,21 @@ export function suggestPages(query, { tabs, favorites, history, activeId }) {
   const term = normalize(query.trim());
   if (!term) return [];
   const matches = new Map();
+  const openTabs = new Map();
+  for (const [id, tab] of tabs) {
+    if (id !== activeId && tab.url && !openTabs.has(tab.url)) openTabs.set(tab.url, { id, tab });
+  }
 
-  function add(url, title, kind, id) {
+  function add(url, title, kind) {
     if (!url || matches.has(url) || !matchesPage(term, url, title)) return;
     const host = new URL(url).hostname;
     const label = pageTitle(title);
     const startsWithTerm = [host, label].some((value) => normalize(value).startsWith(term));
-    matches.set(url, { url, title: label || host, kind, id, startsWithTerm });
+    const open = openTabs.get(url);
+    matches.set(url, { url, title: label || host, kind: open ? 'tab' : kind, id: open?.id, startsWithTerm });
   }
 
-  for (const [id, tab] of tabs) {
-    if (id !== activeId) add(tab.url, tab.title, 'tab', id);
-  }
+  for (const [url, { tab }] of openTabs) add(url, tab.title, 'tab');
   for (const [url, title] of favorites) add(url, title, 'favorite');
   for (const { url, title } of history) add(url, title, 'history');
 
