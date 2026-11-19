@@ -1,5 +1,6 @@
 import { resolveAddress } from './address.js';
 import { initHome } from './home.js';
+import { initSidebar } from './sidebar.js';
 import { readSession, SESSION_KEY, websiteAddress } from './session.js';
 
 const tauri = window.__TAURI__;
@@ -7,9 +8,8 @@ const byId = (id) => document.getElementById(id);
 const address = byId('address');
 const home = byId('home');
 const status = byId('status');
-const query = byId('query');
-const searchDialog = byId('search-dialog');
-const tabDialog = byId('tab-dialog');
+const homeSearch = byId('home-search');
+const stage = byId('site-stage');
 const tabFilter = byId('tab-filter');
 const tabList = byId('tab-list');
 const reopenButton = byId('reopen-tab');
@@ -28,6 +28,8 @@ const tabs = new Map(session.tabs.map((url, id) => [id, {
   url, loaded: false, pinned: session.pinnedIndices.has(id),
 }]));
 let activeId = session.activeIndex;
+let sidebarSettings = session.sidebar;
+let addressDirty = false;
 let nextId = tabs.size;
 let pending = Promise.resolve();
 let storageFailed = false;
@@ -56,6 +58,7 @@ function saveSession() {
       activeIndex: entries.findIndex(([id]) => id === activeId),
       pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
       favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
+      sidebar: sidebarSettings,
     }));
     storageFailed = false;
   } catch {
@@ -66,7 +69,7 @@ function saveSession() {
 
 function render() {
   const tab = tabs.get(activeId);
-  address.querySelector('span').textContent = tab.url || 'Pesquisar ou digitar endereço';
+  if (!addressDirty) address.value = tab.url;
   home.hidden = tab.loaded;
   for (const button of document.querySelectorAll('[data-tab-action]')) {
     button.disabled = !tab.loaded;
@@ -132,12 +135,24 @@ function renderResume() {
 
 const resetHome = initHome(renderResume);
 
+function showCurrentAddress() {
+  addressDirty = false;
+  address.setCustomValidity('');
+  address.value = tabs.get(activeId).url;
+}
+
+function sidebarOffset() {
+  return stage.getBoundingClientRect().left;
+}
+
 async function selectTab(id) {
   if (!tabs.has(id)) return;
-  activeId = id;
-  saveSession();
-  if (tabDialog.open) tabDialog.close();
-  else await syncView();
+  if (id !== activeId) {
+    activeId = id;
+    showCurrentAddress();
+    saveSession();
+  }
+  await syncView(id);
 }
 
 async function closeTab(id) {
@@ -149,25 +164,28 @@ async function closeTab(id) {
     recentlyClosed.push({ url: tab.url, pinned: tab.pinned });
     if (recentlyClosed.length > 20) recentlyClosed.shift();
   }
+  const previousActive = activeId;
   const ids = orderedTabs().map(([id]) => id);
   const index = ids.indexOf(id);
   tabs.delete(id);
   if (!tabs.size) createTab();
   else if (id === activeId) activeId = ids[index + 1] ?? ids[index - 1];
+  if (activeId !== previousActive) {
+    showCurrentAddress();
+  }
   saveSession();
   await syncView();
-  if (tabDialog.open) {
-    refreshTabList();
-    const nextRow = tabList.children[Math.min(index, tabList.children.length - 1)];
-    (nextRow?.querySelector('button') ?? tabFilter).focus();
-  }
 }
 
 function refreshTabList() {
+  const focused = document.activeElement;
+  const target = focused?.closest('#tab-list button')?.dataset.focusKey;
+  const scroll = tabList.scrollTop;
   tabList.replaceChildren();
   reopenButton.disabled = !recentlyClosed.length;
-  const filter = tabFilter.value.trim().toLocaleLowerCase('pt-BR');
+  const filter = sidebarSettings.collapsed ? '' : (tabFilter.value || '').trim().toLocaleLowerCase('pt-BR');
   for (const [id, tab] of orderedTabs()) {
+    if (sidebarSettings.collapsed && id !== activeId) continue;
     const title = tab.url ? new URL(tab.url).hostname : 'Nova aba';
     if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter)
       && !tab.url.toLowerCase().includes(filter)) continue;
@@ -175,21 +193,25 @@ function refreshTabList() {
     const row = document.createElement('li');
     row.dataset.pinned = String(tab.pinned);
     const select = document.createElement('button');
-    select.textContent = title;
+    select.textContent = sidebarSettings.collapsed ? Array.from(title)[0].toUpperCase() : title;
     select.title = tab.url || title;
+    select.setAttribute('aria-label', title);
+    select.dataset.focusKey = 'select-' + id;
     if (id === activeId) select.setAttribute('aria-current', 'true');
     select.addEventListener('click', () => schedule(() => selectTab(id)));
 
     const close = document.createElement('button');
     close.textContent = '×';
+    close.dataset.focusKey = 'close-' + id;
     close.setAttribute('aria-label', 'Fechar aba ' + title);
     close.addEventListener('click', () => schedule(() => closeTab(id)));
     row.append(select);
-    if (tab.url) {
+    if (tab.url && !sidebarSettings.collapsed) {
       const pin = document.createElement('button');
       const label = tab.pinned ? 'Desafixar' : 'Fixar';
       pin.textContent = label;
       pin.dataset.pin = String(id);
+      pin.dataset.focusKey = 'pin-' + id;
       pin.setAttribute('aria-label', label + ' aba ' + title);
       pin.addEventListener('click', () => schedule(() => {
         if (!tabs.has(id)) return;
@@ -200,10 +222,16 @@ function refreshTabList() {
       }));
       row.append(pin);
     }
-    row.append(close);
+    if (!sidebarSettings.collapsed) row.append(close);
     tabList.append(row);
   }
   byId('tabs-empty').hidden = tabList.childElementCount > 0;
+  tabList.scrollTop = scroll;
+  if (target) {
+    const next = tabList.querySelector(`[data-focus-key="${target}"]`)
+      ?? tabList.querySelector('[aria-current="true"]') ?? tabFilter;
+    next.focus({ preventScroll: true });
+  }
 }
 
 function createTab(url = '', pinned = false) {
@@ -211,8 +239,9 @@ function createTab(url = '', pinned = false) {
   tabs.set(activeId, { url, loaded: false, pinned });
 }
 
-async function syncView() {
+async function syncView(focusTabId) {
   render();
+  refreshTabList();
   if (!home.hidden && !byId('home-resume').hidden) renderResume();
   if (!tauri) return;
   const tab = tabs.get(activeId);
@@ -222,11 +251,11 @@ async function syncView() {
   }
   if (!tab.loaded) {
     await invoke('show_tab', { id: null });
-    await invoke('navigate_tab', { id: activeId, address: tab.url });
+    await invoke('navigate_tab', { id: activeId, address: tab.url, sidebarLeft: sidebarOffset() });
     tab.loaded = true;
     render();
   }
-  await invoke('show_tab', { id: activeId });
+  await invoke('show_tab', { id: activeId, focus: focusTabId === activeId });
 }
 
 async function go(url) {
@@ -236,38 +265,30 @@ async function go(url) {
 
   const id = activeId;
   const tab = tabs.get(id);
-  await invoke('navigate_tab', { id, address: target });
+  await invoke('navigate_tab', { id, address: target, sidebarLeft: sidebarOffset() });
   tab.url = target;
   tab.loaded = true;
+  showCurrentAddress();
+  homeSearch.value = '';
   saveSession();
-  if (searchDialog.open) searchDialog.close();
-  else await syncView();
+  await syncView(id);
 }
 
 function openDialog(dialog) {
   schedule(async () => {
     if (document.querySelector('dialog[open]')) return;
     if (tauri) await invoke('show_tab', { id: null });
-    if (dialog === tabDialog) {
-      tabFilter.value = '';
-      refreshTabList();
-    }
-    if (dialog === searchDialog) {
-      query.setCustomValidity('');
-      query.value = tabs.get(activeId).url;
-    }
     dialog.showModal();
-    if (dialog === searchDialog) query.select();
   });
 }
 
 async function openTab(url, pinned) {
   createTab(url, pinned);
   if (!url) resetHome();
+  showCurrentAddress();
   saveSession();
-  if (tabDialog.open) tabDialog.close();
-  else await syncView();
-  address.focus();
+  await syncView(url ? activeId : undefined);
+  if (!url) address.focus();
 }
 
 function reopenTab(entry = recentlyClosed.at(-1)) {
@@ -283,10 +304,6 @@ for (const dialog of document.querySelectorAll('dialog')) {
 for (const button of document.querySelectorAll('[data-dismiss]')) {
   button.addEventListener('click', () => button.closest('dialog').close());
 }
-for (const element of [address, byId('home-search')]) {
-  element.addEventListener('click', () => openDialog(searchDialog));
-}
-byId('tabs-toggle').addEventListener('click', () => openDialog(tabDialog));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
   button.addEventListener('click', () => schedule(() => openTab()));
@@ -324,26 +341,36 @@ if (tauri?.window) {
     });
   }
 }
-byId('search-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const value = query.value;
-  schedule(async () => {
-    try {
-      await go(resolveAddress(value));
-    } catch (error) {
-      if (!searchDialog.open) throw error;
-      query.setCustomValidity(String(error.message ?? error));
-      query.reportValidity();
-    }
+for (const [form, input] of [[byId('address-form'), address], [byId('home-search-form'), homeSearch]]) {
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const value = input.value;
+    schedule(async () => {
+      try {
+        await go(resolveAddress(value));
+      } catch (error) {
+        input.setCustomValidity(String(error.message ?? error));
+        input.reportValidity();
+      }
+    });
   });
+  input.addEventListener('input', () => input.setCustomValidity(''));
+}
+address.addEventListener('input', () => { addressDirty = true; });
+address.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  showCurrentAddress();
+  address.select();
 });
-query.addEventListener('input', () => query.setCustomValidity(''));
+
 document.addEventListener('keydown', (event) => {
   if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
   const key = event.key.toLowerCase();
   if (key === 'l' && !event.shiftKey) {
     event.preventDefault();
-    openDialog(searchDialog);
+    if (document.querySelector('dialog[open]')) return;
+    address.focus();
+    address.select();
     return;
   }
   if (document.querySelector('dialog[open]')) return;
@@ -356,8 +383,33 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+let resizeFrame;
+function scheduleLayout() {
+  if (!tauri) return;
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => schedule(() => invoke('resize_tabs', {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    sidebarLeft: sidebarOffset(),
+  })));
+}
+
+initSidebar({
+  ...sidebarSettings,
+  onChange(settings) {
+    const changedMode = settings.collapsed !== sidebarSettings.collapsed;
+    sidebarSettings = settings;
+    if (changedMode) {
+      tabFilter.value = '';
+      refreshTabList();
+    }
+    saveSession();
+  },
+  onResize: scheduleLayout,
+});
 renderFavorites();
 render();
+refreshTabList();
 if (tauri) {
   schedule(async () => {
     await tauri.event.listen('orla-location', ({ payload }) => {
@@ -368,17 +420,10 @@ if (tauri) {
       tab.url = url;
       saveSession();
       if (id === activeId) render();
-      if (tabDialog.open) refreshTabList();
+      refreshTabList();
       if (!home.hidden && !byId('home-resume').hidden) renderResume();
     });
     await syncView();
   });
-  let resizeFrame;
-  window.addEventListener('resize', () => {
-    cancelAnimationFrame(resizeFrame);
-    resizeFrame = requestAnimationFrame(() => schedule(() => invoke('resize_tabs', {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    })));
-  });
+  window.addEventListener('resize', scheduleLayout);
 }

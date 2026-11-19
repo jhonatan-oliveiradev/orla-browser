@@ -1,3 +1,5 @@
+import { sidebarWidth } from './sidebar.js';
+
 export const SESSION_KEY = 'orla.session.v1';
 
 const initialFavorites = [
@@ -43,5 +45,9 @@ export function readSession(serialized) {
     const title = typeof item.title === 'string' ? item.title.trim().slice(0, 100) : '';
     favorites.set(url, title || new URL(url).hostname);
   }
-  return { tabs, activeIndex, favorites, pinnedIndices };
+  const sidebar = {
+    width: sidebarWidth(saved?.sidebar?.width),
+    collapsed: saved?.sidebar?.collapsed === true,
+  };
+  return { tabs, activeIndex, favorites, pinnedIndices, sidebar };
 }

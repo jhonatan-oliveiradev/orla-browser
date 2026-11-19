@@ -65,3 +65,11 @@ test('restores pins for valid pages and leaves older sessions unpinned', () => {
   assert.deepEqual(session.tabs, tabs);
   assert.equal(session.activeIndex, 2);
 });
+
+test('restores sidebar width and collapse state without breaking existing sessions', () => {
+  assert.deepEqual(readSession('{}').sidebar, { width: 240, collapsed: false });
+  for (const [width, expected] of [[88, 184], [260.7, 261], [700, 360], ['260', 240]]) {
+    const session = readSession(JSON.stringify({ sidebar: { width, collapsed: true } }));
+    assert.deepEqual(session.sidebar, { width: expected, collapsed: true });
+  }
+});

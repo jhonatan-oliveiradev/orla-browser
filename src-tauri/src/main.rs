@@ -3,7 +3,7 @@
 use serde::Serialize;
 use tauri::{
     webview::{NewWindowResponse, WebviewBuilder},
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewUrl,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Url, Webview, WebviewUrl,
 };
 
 const SHELL: &str = "orla";
@@ -39,11 +39,13 @@ fn as_message(error: tauri::Error) -> String {
     error.to_string()
 }
 
-fn site_size(width: f64, height: f64) -> LogicalSize<f64> {
-    LogicalSize::new(
-        (width - RESIZE_EDGE * 2.0).max(1.0),
+fn site_bounds(width: f64, height: f64, sidebar_left: f64) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    let left = sidebar_left.clamp(RESIZE_EDGE, (width - RESIZE_EDGE - 1.0).max(RESIZE_EDGE));
+    let size = LogicalSize::new(
+        (width - left - RESIZE_EDGE).max(1.0),
         (height - TOOLBAR - RESIZE_EDGE).max(1.0),
-    )
+    );
+    (LogicalPosition::new(left, TOOLBAR), size)
 }
 
 fn tab_label(id: u32) -> String {
@@ -51,7 +53,9 @@ fn tab_label(id: u32) -> String {
 }
 
 #[tauri::command]
-async fn navigate_tab(caller: Webview, app: AppHandle, id: u32, address: String) -> CommandResult {
+async fn navigate_tab(
+    caller: Webview, app: AppHandle, id: u32, address: String, sidebar_left: f64,
+) -> CommandResult {
     ui_only(&caller)?;
     let url = Url::parse(&address).map_err(|_| "Endereço inválido.".to_string())?;
     if !website(&url) {
@@ -69,6 +73,7 @@ async fn navigate_tab(caller: Webview, app: AppHandle, id: u32, address: String)
         .inner_size()
         .map_err(as_message)?
         .to_logical::<f64>(scale);
+    let (position, size) = site_bounds(size.width, size.height, sidebar_left);
     let builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
@@ -83,17 +88,15 @@ async fn navigate_tab(caller: Webview, app: AppHandle, id: u32, address: String)
             );
         });
     window
-        .add_child(
-            builder,
-            LogicalPosition::new(RESIZE_EDGE, TOOLBAR),
-            site_size(size.width, size.height),
-        )
+        .add_child(builder, position, size)
         .map(|_| ())
         .map_err(as_message)
 }
 
 #[tauri::command]
-async fn show_tab(caller: Webview, app: AppHandle, id: Option<u32>) -> CommandResult {
+async fn show_tab(
+    caller: Webview, app: AppHandle, id: Option<u32>, focus: Option<bool>,
+) -> CommandResult {
     ui_only(&caller)?;
     let active = id.map(tab_label);
     for (label, view) in app.webviews() {
@@ -103,17 +106,23 @@ async fn show_tab(caller: Webview, app: AppHandle, id: Option<u32>) -> CommandRe
     }
     if let Some(view) = active.and_then(|label| app.get_webview(&label)) {
         view.show().map_err(as_message)?;
+        if focus == Some(true) {
+            view.set_focus().map_err(as_message)?;
+        }
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn resize_tabs(caller: Webview, app: AppHandle, width: f64, height: f64) -> CommandResult {
+async fn resize_tabs(
+    caller: Webview, app: AppHandle, width: f64, height: f64, sidebar_left: f64,
+) -> CommandResult {
     ui_only(&caller)?;
-    let size = site_size(width, height);
+    let (position, size) = site_bounds(width, height, sidebar_left);
+    let bounds = Rect { position: position.into(), size: size.into() };
     for (label, view) in app.webviews() {
         if label.starts_with("tab-") {
-            view.set_size(size).map_err(as_message)?;
+            view.set_bounds(bounds).map_err(as_message)?;
         }
     }
     Ok(())
