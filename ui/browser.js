@@ -1,4 +1,5 @@
 import { resolveAddress } from './address.js';
+import { readSession, SESSION_KEY, websiteAddress } from './session.js';
 
 const tauri = window.__TAURI__;
 const byId = (id) => document.getElementById(id);
@@ -8,10 +9,25 @@ const status = byId('status');
 const query = byId('query');
 const searchDialog = byId('search-dialog');
 const tabDialog = byId('tab-dialog');
-const tabs = new Map();
-let activeId = 0;
-let nextId = 1;
+const tabFilter = byId('tab-filter');
+const tabList = byId('tab-list');
+const reopenButton = byId('reopen-tab');
+const favoriteButton = byId('favorite-page');
+const recentlyClosed = [];
+
+let snapshot = null;
+try {
+  if (tauri) snapshot = localStorage.getItem(SESSION_KEY);
+} catch {
+  // Navigation remains available if the WebView storage cannot be read.
+}
+const session = readSession(snapshot);
+const favorites = session.favorites;
+const tabs = new Map(session.tabs.map((url, id) => [id, { url, loaded: false }]));
+let activeId = session.activeIndex;
+let nextId = tabs.size;
 let pending = Promise.resolve();
+let storageFailed = false;
 
 function showError(error) {
   status.textContent = String(error.message ?? error);
@@ -28,74 +44,170 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
+function saveSession() {
+  if (!tauri) return;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      tabs: Array.from(tabs.values(), (tab) => tab.url),
+      activeIndex: Array.from(tabs.keys()).indexOf(activeId),
+      favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
+    }));
+    storageFailed = false;
+  } catch {
+    if (!storageFailed) showError('O Orla não conseguiu salvar a sessão neste dispositivo.');
+    storageFailed = true;
+  }
+}
+
 function render() {
   const tab = tabs.get(activeId);
   address.querySelector('span').textContent = tab.url || 'Pesquisar ou digitar endereço';
-  home.hidden = Boolean(tab.url);
+  home.hidden = tab.loaded;
   for (const button of document.querySelectorAll('[data-tab-action]')) {
-    button.disabled = !tab.url;
+    button.disabled = !tab.loaded;
+  }
+
+  const saved = favorites.has(tab.url);
+  const label = saved ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+  favoriteButton.disabled = !tab.url;
+  favoriteButton.setAttribute('aria-pressed', String(saved));
+  favoriteButton.setAttribute('aria-label', label);
+  favoriteButton.title = label;
+  favoriteButton.textContent = saved ? '★' : '☆';
+}
+
+function renderFavorites() {
+  const list = byId('favorites-list');
+  list.replaceChildren();
+  byId('favorites-empty').hidden = favorites.size > 0;
+  for (const [url, title] of favorites) {
+    const button = document.createElement('button');
+    button.textContent = title;
+    button.title = url;
+    button.addEventListener('click', () => schedule(() => go(url)));
+    list.append(button);
+  }
+}
+
+async function closeTab(id) {
+  const tab = tabs.get(id);
+  if (!tab) return;
+  if (tab.loaded) await invoke('tab_action', { id, action: 'close' });
+
+  if (tab.url) {
+    recentlyClosed.push(tab.url);
+    if (recentlyClosed.length > 20) recentlyClosed.shift();
+  }
+  const ids = Array.from(tabs.keys());
+  const index = ids.indexOf(id);
+  tabs.delete(id);
+  if (!tabs.size) createTab();
+  else if (id === activeId) activeId = ids[index + 1] ?? ids[index - 1];
+  saveSession();
+  await syncView();
+  if (tabDialog.open) {
+    refreshTabList();
+    const nextRow = tabList.children[Math.min(index, tabList.children.length - 1)];
+    (nextRow?.querySelector('button') ?? tabFilter).focus();
   }
 }
 
 function refreshTabList() {
-  const list = byId('tab-list');
-  list.replaceChildren();
+  tabList.replaceChildren();
+  reopenButton.disabled = !recentlyClosed.length;
+  const filter = tabFilter.value.trim().toLocaleLowerCase('pt-BR');
   for (const [id, tab] of tabs) {
+    const title = tab.url ? new URL(tab.url).hostname : 'Nova aba';
+    if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter)
+      && !tab.url.toLowerCase().includes(filter)) continue;
+
     const row = document.createElement('li');
     const select = document.createElement('button');
-    select.textContent = tab.url ? new URL(tab.url).hostname : 'Nova aba';
+    select.textContent = title;
+    select.title = tab.url || title;
     if (id === activeId) select.setAttribute('aria-current', 'true');
-    select.addEventListener('click', () => schedule(async () => {
+    select.addEventListener('click', () => schedule(() => {
+      if (!tabs.has(id)) return;
       activeId = id;
+      saveSession();
       tabDialog.close();
-      await syncView();
     }));
+
     const close = document.createElement('button');
     close.textContent = '×';
-    close.setAttribute('aria-label', 'Fechar aba ' + select.textContent);
-    close.addEventListener('click', () => schedule(async () => {
-      if (tab.url) await invoke('tab_action', { id, action: 'close' });
-      tabs.delete(id);
-      if (!tabs.size) createTab();
-      if (id === activeId) activeId = tabs.keys().next().value;
-      refreshTabList();
-      render();
-      tabDialog.querySelector('#add-tab').focus();
-    }));
+    close.setAttribute('aria-label', 'Fechar aba ' + title);
+    close.addEventListener('click', () => schedule(() => closeTab(id)));
     row.append(select, close);
-    list.append(row);
+    tabList.append(row);
   }
+  byId('tabs-empty').hidden = tabList.childElementCount > 0;
 }
 
-function createTab() {
+function createTab(url = '') {
   activeId = nextId++;
-  tabs.set(activeId, { url: '' });
-  render();
+  tabs.set(activeId, { url, loaded: false });
 }
 
 async function syncView() {
   render();
-  const viewing = tabs.get(activeId).url && !document.querySelector('dialog[open]');
-  if (tauri) await invoke('show_tab', { id: viewing ? activeId : null });
+  if (!tauri) return;
+  const tab = tabs.get(activeId);
+  if (!tab.url || document.querySelector('dialog[open]')) {
+    await invoke('show_tab', { id: null });
+    return;
+  }
+  if (!tab.loaded) {
+    await invoke('show_tab', { id: null });
+    await invoke('navigate_tab', { id: activeId, address: tab.url });
+    tab.loaded = true;
+    render();
+  }
+  await invoke('show_tab', { id: activeId });
 }
 
 async function go(url) {
   status.hidden = true;
-  await invoke('navigate_tab', { id: activeId, address: url });
-  tabs.get(activeId).url = url;
+  const target = websiteAddress(url);
+  if (!target) throw new Error('Use um endereço HTTP ou HTTPS válido, sem credenciais.');
+
+  const id = activeId;
+  const tab = tabs.get(id);
+  await invoke('navigate_tab', { id, address: target });
+  tab.url = target;
+  tab.loaded = true;
+  saveSession();
   if (searchDialog.open) searchDialog.close();
-  await syncView();
+  else await syncView();
 }
 
 function openDialog(dialog) {
   schedule(async () => {
     if (document.querySelector('dialog[open]')) return;
     if (tauri) await invoke('show_tab', { id: null });
-    if (dialog === tabDialog) refreshTabList();
-    if (dialog === searchDialog) query.value = tabs.get(activeId).url;
+    if (dialog === tabDialog) {
+      tabFilter.value = '';
+      refreshTabList();
+    }
+    if (dialog === searchDialog) {
+      query.setCustomValidity('');
+      query.value = tabs.get(activeId).url;
+    }
     dialog.showModal();
     if (dialog === searchDialog) query.select();
   });
+}
+
+async function openTab(url) {
+  createTab(url);
+  saveSession();
+  if (tabDialog.open) tabDialog.close();
+  else await syncView();
+  address.focus();
+}
+
+function reopenTab() {
+  const url = recentlyClosed.pop();
+  if (url) return openTab(url);
 }
 
 for (const dialog of document.querySelectorAll('dialog')) {
@@ -110,16 +222,20 @@ for (const element of [address, byId('home-search')]) {
 byId('tabs-toggle').addEventListener('click', () => openDialog(tabDialog));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
-  button.addEventListener('click', () => schedule(async () => {
-    createTab();
-    if (tabDialog.open) tabDialog.close();
-    await syncView();
-    address.focus();
-  }));
+  button.addEventListener('click', () => schedule(() => openTab()));
 }
-for (const button of document.querySelectorAll('[data-url]')) {
-  button.addEventListener('click', () => schedule(() => go(button.dataset.url)));
-}
+reopenButton.addEventListener('click', () => schedule(reopenTab));
+tabFilter.addEventListener('input', refreshTabList);
+favoriteButton.addEventListener('click', () => {
+  const url = tabs.get(activeId).url;
+  if (!url) return;
+  if (favorites.has(url)) favorites.delete(url);
+  else favorites.set(url, new URL(url).hostname);
+  saveSession();
+  renderFavorites();
+  render();
+});
+
 for (const button of document.querySelectorAll('[data-tab-action]')) {
   button.addEventListener('click', () => schedule(() => invoke('tab_action', { id: activeId, action: button.dataset.tabAction })));
 }
@@ -128,31 +244,52 @@ for (const button of document.querySelectorAll('[data-window-action]')) {
 }
 byId('search-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  schedule(() => go(resolveAddress(query.value))).then(() => {
-    if (searchDialog.open && !status.hidden) {
-      query.setCustomValidity(status.textContent);
+  const value = query.value;
+  schedule(async () => {
+    try {
+      await go(resolveAddress(value));
+    } catch (error) {
+      if (!searchDialog.open) throw error;
+      query.setCustomValidity(String(error.message ?? error));
       query.reportValidity();
     }
   });
 });
 query.addEventListener('input', () => query.setCustomValidity(''));
 document.addEventListener('keydown', (event) => {
-  if (event.ctrlKey && event.key.toLowerCase() === 'l') {
+  if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
+  const key = event.key.toLowerCase();
+  if (key === 'l' && !event.shiftKey) {
     event.preventDefault();
     openDialog(searchDialog);
+    return;
+  }
+  if (document.querySelector('dialog[open]')) return;
+  if (key === 't') {
+    event.preventDefault();
+    schedule(event.shiftKey ? reopenTab : () => openTab());
+  } else if (key === 'w' && !event.shiftKey) {
+    event.preventDefault();
+    schedule(() => closeTab(activeId));
   }
 });
 
-createTab();
+renderFavorites();
+render();
 if (tauri) {
-  tauri.event.listen('orla-location', ({ payload }) => {
-    const id = Number(payload.id.slice(4));
-    const tab = tabs.get(id);
-    if (tab) {
-      tab.url = payload.url;
+  schedule(async () => {
+    await tauri.event.listen('orla-location', ({ payload }) => {
+      const id = Number(payload.id.slice(4));
+      const tab = tabs.get(id);
+      const url = websiteAddress(payload.url);
+      if (!tab || !url || url === tab.url) return;
+      tab.url = url;
+      saveSession();
       if (id === activeId) render();
-    }
-  }).catch(showError);
+      if (tabDialog.open) refreshTabList();
+    });
+    await syncView();
+  });
   let resizeFrame;
   window.addEventListener('resize', () => {
     cancelAnimationFrame(resizeFrame);

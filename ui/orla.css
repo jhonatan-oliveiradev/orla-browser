@@ -21,6 +21,8 @@ button:disabled { opacity: .42; cursor: default; }
 .toolbar button { min-height: 32px; border-radius: 6px; }
 .icon { width: 32px; display: inline-grid; place-items: center; }
 .icon img, .address img { width: 17px; height: 17px; flex: none; }
+#favorite-page { font-size: 19px; }
+#favorite-page[aria-pressed="true"] { color: var(--accent); }
 .address { gap: 10px; background: var(--graphite); text-align: left; min-width: 0; }
 .toolbar .address { flex: 1; padding: 0 13px; border-radius: 16px; color: var(--muted); }
 .address span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -34,8 +36,9 @@ h1 { margin: 0 0 32px; font: 400 clamp(48px, 7vw, 78px)/1.15 'Lora', Georgia, se
 .featured span { text-align: right; color: var(--accent); }
 .favorites { max-width: 508px; margin-top: 63px; }
 .favorites p { color: var(--muted); border-bottom: 1px solid #4b4337; padding-bottom: 10px; }
-.favorites div { display: flex; justify-content: space-between; gap: 10px; }
-.favorites button { border-radius: 5px; padding: 6px; text-align: left; }
+.favorites div { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.favorites button { border-radius: 5px; padding: 6px; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+#favorites-empty { color: var(--muted); }
 dialog { color: var(--text); background: var(--toolbar); border: 1px solid #4b4337; border-radius: 12px; max-width: calc(100vw - 36px); padding: 20px; }
 dialog::backdrop { background: #18161299; }
 dialog button { border-radius: 6px; padding: 9px 11px; }
@@ -43,13 +46,14 @@ dialog p { color: var(--muted); }
 #search-dialog { margin: 90px auto 0; width: 620px; }
 #search-form { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
 #search-form label { grid-column: 1/-1; }
-#query { background: var(--graphite); border: 1px solid #4b4337; border-radius: 8px; padding: 12px; min-width: 0; }
+#query, #tab-filter { background: var(--graphite); border: 1px solid #4b4337; border-radius: 8px; padding: 12px; min-width: 0; }
 .primary { background: var(--accent); color: var(--night); }
 .primary:hover { background: #e5ff9b; }
-#tab-dialog { margin: 63px 0 0 12px; width: 300px; }
-.dialog-heading, #tab-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#tab-dialog { margin: 63px 0 0 12px; width: 320px; max-height: calc(100dvh - 75px); }
+#tab-filter { width: 100%; margin-top: 12px; }
+.dialog-heading, .dialog-actions, #tab-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h2 { font-size: 18px; margin: 0; }
-#tab-list { padding: 0; list-style: none; }
+#tab-list { padding: 0; list-style: none; overflow-y: auto; max-height: max(120px, calc(100dvh - 300px)); }
 #tab-list li button:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 #tab-list [aria-current=true] { background: var(--graphite); color: var(--accent); }
 #status { position: fixed; bottom: 18px; left: 18px; z-index: 1; background: var(--toolbar); padding: 12px; border: 1px solid #4b4337; }
