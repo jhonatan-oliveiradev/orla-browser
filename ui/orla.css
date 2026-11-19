@@ -164,7 +164,8 @@ h2 { font-size: 18px; margin: 0; }
 #status { position: fixed; bottom: 18px; left: 18px; z-index: 1; background: var(--toolbar); padding: 12px; border: 1px solid var(--line); }
 
 @media (max-width: 780px) {
-  .toolbar { gap: 5px; padding-inline: 12px; }
+  .toolbar { gap: 4px; padding-inline: 12px; }
+  .toolbar .icon { width: 28px; padding-inline: 0; }
   .toolbar > #tabs-toggle { margin-right: 4px; }
   .window-drag-space { flex-basis: 26px; }
   .window-actions { gap: 2px; }
