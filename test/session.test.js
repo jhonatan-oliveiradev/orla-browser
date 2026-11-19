@@ -73,3 +73,11 @@ test('restores sidebar width and collapse state without breaking existing sessio
     assert.deepEqual(session.sidebar, { width: expected, collapsed: true });
   }
 });
+
+test('restores a supported theme and the background animation preference', () => {
+  assert.deepEqual(readSession('{}').appearance, { theme: 'lima', motion: true });
+  assert.deepEqual(readSession('{"appearance":{"theme":"lavanda","motion":false}}').appearance,
+    { theme: 'lavanda', motion: false });
+  assert.deepEqual(readSession('{"appearance":{"theme":"inexistente","motion":"false"}}').appearance,
+    { theme: 'lima', motion: true });
+});

@@ -22,6 +22,7 @@
     </form>
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
+    <button id="appearance" type="button" aria-haspopup="dialog" aria-controls="appearance-dialog">Tema</button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
@@ -44,6 +45,13 @@
     </aside>
     <div id="site-stage" class="site-stage">
       <main id="home">
+        <div class="home-art" aria-hidden="true">
+          <svg viewBox="0 0 567 670" preserveAspectRatio="none" focusable="false">
+            <path class="art-band" d="M310 0H567L260 670H0L310 0Z"/>
+            <path class="art-accent" d="M444 0H567L311 670H220L444 0Z"/>
+            <path class="art-lines" d="M565 90L311 670M499 0L229 670"/>
+          </svg>
+        </div>
         <div class="home-nav" role="tablist" aria-label="Nova aba">
           <button type="button" role="tab" id="home-start-tab" aria-controls="home-start" aria-selected="true">Início</button>
           <button type="button" role="tab" id="home-widgets-tab" aria-controls="home-widgets" aria-selected="false" tabindex="-1">Widgets</button>
@@ -106,6 +114,17 @@
     <div data-resize="NorthWest"></div>
   </div>
   <p id="status" role="status" hidden></p>
+  <dialog id="appearance-dialog" aria-labelledby="appearance-heading">
+    <h2 id="appearance-heading">Aparência</h2>
+    <fieldset class="theme-options">
+      <legend>Tema do Orla</legend>
+      <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span> Lima</label>
+      <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span> Lavanda</label>
+      <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span> Areia</label>
+    </fieldset>
+    <label class="motion-option"><input id="appearance-motion" type="checkbox" checked> Animar fundo da Nova Aba</label>
+    <button type="button" data-dismiss>Fechar</button>
+  </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">
     <h2 id="agent-heading">Agente</h2>
     <p>O envio de conteúdo a modelos está desativado nesta versão.</p>

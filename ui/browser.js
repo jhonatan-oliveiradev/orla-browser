@@ -1,4 +1,5 @@
 import { resolveAddress } from './address.js';
+import { initAppearance } from './appearance.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
 import { readSession, SESSION_KEY, websiteAddress } from './session.js';
@@ -29,6 +30,7 @@ const tabs = new Map(session.tabs.map((url, id) => [id, {
 }]));
 let activeId = session.activeIndex;
 let sidebarSettings = session.sidebar;
+let appearance = session.appearance;
 let addressDirty = false;
 let nextId = tabs.size;
 let pending = Promise.resolve();
@@ -59,6 +61,7 @@ function saveSession() {
       pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
       favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
       sidebar: sidebarSettings,
+      appearance,
     }));
     storageFailed = false;
   } catch {
@@ -304,6 +307,7 @@ for (const dialog of document.querySelectorAll('dialog')) {
 for (const button of document.querySelectorAll('[data-dismiss]')) {
   button.addEventListener('click', () => button.closest('dialog').close());
 }
+byId('appearance').addEventListener('click', () => openDialog(byId('appearance-dialog')));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
   button.addEventListener('click', () => schedule(() => openTab()));
@@ -393,6 +397,11 @@ function scheduleLayout() {
     sidebarLeft: sidebarOffset(),
   })));
 }
+
+initAppearance(appearance, (settings) => {
+  appearance = settings;
+  saveSession();
+});
 
 initSidebar({
   ...sidebarSettings,

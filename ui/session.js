@@ -1,3 +1,4 @@
+import { readAppearance } from './appearance.js';
 import { sidebarWidth } from './sidebar.js';
 
 export const SESSION_KEY = 'orla.session.v1';
@@ -49,5 +50,6 @@ export function readSession(serialized) {
     width: sidebarWidth(saved?.sidebar?.width),
     collapsed: saved?.sidebar?.collapsed === true,
   };
-  return { tabs, activeIndex, favorites, pinnedIndices, sidebar };
+  const appearance = readAppearance(saved?.appearance);
+  return { tabs, activeIndex, favorites, pinnedIndices, sidebar, appearance };
 }
