@@ -1,4 +1,5 @@
 import { resolveAddress } from './address.js';
+import { initHome } from './home.js';
 import { readSession, SESSION_KEY, websiteAddress } from './session.js';
 
 const tauri = window.__TAURI__;
@@ -89,13 +90,55 @@ function renderFavorites() {
   }
 }
 
+function resumeRow(url, activate) {
+  const row = document.createElement('li');
+  const button = document.createElement('button');
+  const host = document.createElement('strong');
+  const detail = document.createElement('span');
+  const address = new URL(url);
+  host.textContent = address.hostname;
+  detail.textContent = address.pathname + address.search + address.hash;
+  button.title = url;
+  button.append(host, detail);
+  button.addEventListener('click', () => schedule(activate));
+  row.append(button);
+  return row;
+}
+
+function renderResume() {
+  const open = byId('resume-open');
+  const closed = byId('resume-closed');
+  open.replaceChildren();
+  closed.replaceChildren();
+  for (const [id, tab] of tabs) {
+    if (!tab.url || id === activeId) continue;
+    open.append(resumeRow(tab.url, () => selectTab(id)));
+  }
+  for (let index = recentlyClosed.length - 1; index >= 0; index--) {
+    const entry = recentlyClosed[index];
+    closed.append(resumeRow(entry.url, () => reopenTab(entry)));
+  }
+  byId('resume-open-empty').hidden = open.childElementCount > 0;
+  byId('resume-closed-empty').hidden = closed.childElementCount > 0;
+}
+
+const resetHome = initHome(renderResume);
+
+async function selectTab(id) {
+  if (!tabs.has(id)) return;
+  activeId = id;
+  saveSession();
+  if (tabDialog.open) tabDialog.close();
+  else await syncView();
+}
+
 async function closeTab(id) {
   const tab = tabs.get(id);
   if (!tab) return;
   if (tab.loaded) await invoke('tab_action', { id, action: 'close' });
 
   if (tab.url) {
-    recentlyClosed.push(tab.url);
+    recentlyClosed.push({ url: tab.url });
     if (recentlyClosed.length > 20) recentlyClosed.shift();
   }
   const ids = Array.from(tabs.keys());
@@ -126,12 +169,7 @@ function refreshTabList() {
     select.textContent = title;
     select.title = tab.url || title;
     if (id === activeId) select.setAttribute('aria-current', 'true');
-    select.addEventListener('click', () => schedule(() => {
-      if (!tabs.has(id)) return;
-      activeId = id;
-      saveSession();
-      tabDialog.close();
-    }));
+    select.addEventListener('click', () => schedule(() => selectTab(id)));
 
     const close = document.createElement('button');
     close.textContent = '×';
@@ -150,6 +188,7 @@ function createTab(url = '') {
 
 async function syncView() {
   render();
+  if (!home.hidden && !byId('home-resume').hidden) renderResume();
   if (!tauri) return;
   const tab = tabs.get(activeId);
   if (!tab.url || document.querySelector('dialog[open]')) {
@@ -199,15 +238,18 @@ function openDialog(dialog) {
 
 async function openTab(url) {
   createTab(url);
+  if (!url) resetHome();
   saveSession();
   if (tabDialog.open) tabDialog.close();
   else await syncView();
   address.focus();
 }
 
-function reopenTab() {
-  const url = recentlyClosed.pop();
-  if (url) return openTab(url);
+function reopenTab(entry = recentlyClosed.at(-1)) {
+  const index = recentlyClosed.indexOf(entry);
+  if (index < 0) return;
+  recentlyClosed.splice(index, 1);
+  return openTab(entry.url);
 }
 
 for (const dialog of document.querySelectorAll('dialog')) {
@@ -287,6 +329,7 @@ if (tauri) {
       saveSession();
       if (id === activeId) render();
       if (tabDialog.open) refreshTabList();
+      if (!home.hidden && !byId('home-resume').hidden) renderResume();
     });
     await syncView();
   });

@@ -8,7 +8,7 @@
   <script type="module" src="browser.js"></script>
 </head>
 <body>
-  <header class="toolbar" aria-label="Navegação">
+  <header class="toolbar" aria-label="Navegação" data-tauri-drag-region>
     <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-dialog" aria-haspopup="dialog"><img src="assets/tabs.svg" alt=""></button>
     <div class="navigation">
       <button class="icon" data-tab-action="back" aria-label="Voltar"><img src="assets/back.svg" alt=""></button>
@@ -19,6 +19,7 @@
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
+    <div class="window-grip" data-tauri-drag-region title="Arraste para mover a janela" aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
       <button class="icon" data-window-action="minimize" aria-label="Minimizar"><img src="assets/min.svg" alt=""></button>
       <button class="icon" data-window-action="maximize" aria-label="Maximizar ou restaurar"><img src="assets/max.svg" alt=""></button>
@@ -26,7 +27,12 @@
     </div>
   </header>
   <main id="home">
-    <div class="home-content">
+    <div class="home-nav" role="tablist" aria-label="Nova aba">
+      <button type="button" role="tab" id="home-start-tab" aria-controls="home-start" aria-selected="true">Início</button>
+      <button type="button" role="tab" id="home-widgets-tab" aria-controls="home-widgets" aria-selected="false" tabindex="-1">Widgets</button>
+      <button type="button" role="tab" id="home-resume-tab" aria-controls="home-resume" aria-selected="false" tabindex="-1">Retomar</button>
+    </div>
+    <section class="home-content" id="home-start" role="tabpanel" aria-labelledby="home-start-tab" tabindex="0">
       <h1>Nova aba</h1>
       <button id="home-search" class="address featured" aria-haspopup="dialog"><img src="assets/search.svg" alt="">Buscar na web <span aria-hidden="true">↵</span></button>
       <nav class="favorites" aria-label="Favoritos">
@@ -34,7 +40,37 @@
         <div id="favorites-list"></div>
         <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
       </nav>
-    </div>
+    </section>
+    <section class="home-workspace" id="home-widgets" role="tabpanel" aria-labelledby="home-widgets-tab" tabindex="0" hidden>
+      <h1>Widgets</h1>
+      <div class="widget-grid">
+        <section class="home-card clock-card" aria-labelledby="clock-title">
+          <h2 id="clock-title">Hora local</h2>
+          <time id="widget-clock"></time>
+          <p id="widget-date"></p>
+        </section>
+        <section class="home-card notes-card" aria-labelledby="notes-title">
+          <h2 id="notes-title"><label for="widget-notes">Bloco de notas</label></h2>
+          <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-status"></textarea>
+          <p id="notes-status" role="status">Salvo neste dispositivo</p>
+        </section>
+      </div>
+    </section>
+    <section class="home-workspace" id="home-resume" role="tabpanel" aria-labelledby="home-resume-tab" tabindex="0" hidden>
+      <h1>Retomar</h1>
+      <div class="widget-grid">
+        <section class="home-card" aria-labelledby="open-tabs-title">
+          <h2 id="open-tabs-title">Abas abertas</h2>
+          <p id="resume-open-empty">As páginas abertas aparecem aqui.</p>
+          <ul class="resume-list" id="resume-open"></ul>
+        </section>
+        <section class="home-card" aria-labelledby="closed-tabs-title">
+          <h2 id="closed-tabs-title">Fechadas recentemente</h2>
+          <p id="resume-closed-empty">As páginas que você fechar nesta sessão aparecem aqui.</p>
+          <ul class="resume-list" id="resume-closed"></ul>
+        </section>
+      </div>
+    </section>
   </main>
   <p id="status" role="status" hidden></p>
   <dialog id="search-dialog" aria-label="Pesquisar ou digitar endereço">
