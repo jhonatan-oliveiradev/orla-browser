@@ -1,3 +1,6 @@
+import { readAppearance } from './appearance.js';
+import { sidebarWidth } from './sidebar.js';
+
 export const SESSION_KEY = 'orla.session.v1';
 
 const initialFavorites = [
@@ -32,6 +35,9 @@ export function readSession(serialized) {
   const activeIndex = Number.isInteger(saved?.activeIndex)
     && saved.activeIndex >= 0 && saved.activeIndex < tabs.length
     ? saved.activeIndex : 0;
+  const pinnedIndices = new Set(Array.isArray(saved?.pinnedIndices)
+    ? saved.pinnedIndices.filter((index) => Number.isInteger(index) && tabs[index])
+    : []);
 
   const favorites = new Map();
   for (const item of Array.isArray(saved?.favorites) ? saved.favorites : initialFavorites) {
@@ -40,5 +46,11 @@ export function readSession(serialized) {
     const title = typeof item.title === 'string' ? item.title.trim().slice(0, 100) : '';
     favorites.set(url, title || new URL(url).hostname);
   }
-  return { tabs, activeIndex, favorites };
+  const sidebar = {
+    width: sidebarWidth(saved?.sidebar?.width),
+    collapsed: saved?.sidebar?.collapsed === true,
+  };
+  const appearance = readAppearance(saved?.appearance);
+  const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
+  return { tabs, activeIndex, favorites, pinnedIndices, sidebar, appearance, searchProvider };
 }

@@ -9,85 +9,191 @@
 </head>
 <body>
   <header class="toolbar" aria-label="Navegação" data-tauri-drag-region>
-    <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-dialog" aria-haspopup="dialog"><img src="assets/tabs.svg" alt=""></button>
+    <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-sidebar" aria-expanded="true"><img src="assets/tabs.svg" alt=""></button>
     <div class="navigation">
       <button class="icon" data-tab-action="back" aria-label="Voltar"><img src="assets/back.svg" alt=""></button>
       <button class="icon" data-tab-action="forward" aria-label="Avançar"><img src="assets/next.svg" alt=""></button>
       <button class="icon" data-tab-action="reload" aria-label="Recarregar"><img src="assets/reload.svg" alt=""></button>
     </div>
-    <button id="address" class="address" aria-haspopup="dialog"><img src="assets/search.svg" alt=""><span>Pesquisar ou digitar endereço</span><kbd>Ctrl+L</kbd></button>
+    <form id="address-form" class="address">
+      <img src="assets/search.svg" alt="">
+      <input id="address" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="address-suggestions" aria-label="Pesquisar ou digitar endereço" placeholder="Pesquisar ou digitar URL" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">Ctrl+L</kbd>
+    </form>
     <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
     <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
+    <button id="appearance" type="button" aria-haspopup="dialog" aria-controls="appearance-dialog">Tema</button>
+    <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog"><span aria-hidden="true">↓</span></button>
     <button id="agent" aria-haspopup="dialog">Agente</button>
-    <div class="window-grip" data-tauri-drag-region title="Arraste para mover a janela" aria-hidden="true"></div>
+    <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
       <button class="icon" data-window-action="minimize" aria-label="Minimizar"><img src="assets/min.svg" alt=""></button>
       <button class="icon" data-window-action="maximize" aria-label="Maximizar ou restaurar"><img src="assets/max.svg" alt=""></button>
       <button class="icon" data-window-action="close" aria-label="Fechar janela"><img src="assets/close.svg" alt=""></button>
     </div>
   </header>
-  <main id="home">
-    <div class="home-nav" role="tablist" aria-label="Nova aba">
-      <button type="button" role="tab" id="home-start-tab" aria-controls="home-start" aria-selected="true">Início</button>
-      <button type="button" role="tab" id="home-widgets-tab" aria-controls="home-widgets" aria-selected="false" tabindex="-1">Widgets</button>
-      <button type="button" role="tab" id="home-resume-tab" aria-controls="home-resume" aria-selected="false" tabindex="-1">Retomar</button>
+  <div class="browser-workspace">
+    <aside id="tab-sidebar" class="tab-sidebar" aria-labelledby="tab-heading">
+      <div class="sidebar-heading">
+        <h2 id="tab-heading">Abas</h2>
+        <button id="add-tab" class="icon" type="button" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
+      </div>
+      <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off">
+      <ul id="tab-list"></ul>
+      <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
+      <button id="reopen-tab" type="button" disabled>Reabrir última aba</button>
+      <div id="sidebar-divider" role="separator" aria-label="Largura da barra de abas" aria-orientation="vertical" aria-controls="tab-sidebar" tabindex="0"></div>
+    </aside>
+    <div id="site-stage" class="site-stage">
+      <ul id="address-suggestions" class="address-suggestions" role="listbox" aria-label="Sugestões locais" hidden></ul>
+      <div id="site-viewport" class="site-viewport">
+        <main id="home">
+          <div class="home-art" aria-hidden="true">
+            <svg viewBox="0 0 567 670" preserveAspectRatio="none" focusable="false">
+              <path class="art-band" d="M310 0H567L260 670H0L310 0Z"/>
+              <path class="art-accent" d="M444 0H567L311 670H220L444 0Z"/>
+              <path class="art-lines" d="M565 90L311 670M499 0L229 670"/>
+            </svg>
+          </div>
+          <div class="home-nav" role="tablist" aria-label="Nova aba">
+            <button type="button" role="tab" id="home-start-tab" aria-controls="home-start" aria-selected="true">Início</button>
+            <button type="button" role="tab" id="home-widgets-tab" aria-controls="home-widgets" aria-selected="false" tabindex="-1">Widgets</button>
+            <button type="button" role="tab" id="home-resume-tab" aria-controls="home-resume" aria-selected="false" tabindex="-1">Retomar</button>
+          </div>
+          <section class="home-content" id="home-start" role="tabpanel" aria-labelledby="home-start-tab" tabindex="0">
+            <h1>Nova aba</h1>
+            <form id="home-search-form" class="address featured">
+              <img src="assets/search.svg" alt="">
+              <input id="home-search" type="text" aria-label="Buscar na web" placeholder="Buscar na web" autocomplete="off" spellcheck="false">
+              <button type="submit" aria-label="Pesquisar">↵</button>
+            </form>
+            <nav class="favorites" aria-label="Favoritos">
+              <p>Favoritos</p>
+              <div id="favorites-list"></div>
+              <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
+            </nav>
+          </section>
+          <section class="home-workspace" id="home-widgets" role="tabpanel" aria-labelledby="home-widgets-tab" tabindex="0" hidden>
+            <h1>Widgets</h1>
+            <div class="widget-grid">
+              <section class="home-card clock-card" aria-labelledby="clock-title">
+                <h2 id="clock-title">Hora local</h2>
+                <time id="widget-clock"></time>
+                <p id="widget-date"></p>
+              </section>
+              <section class="home-card notes-card" aria-labelledby="notes-title">
+                <h2 id="notes-title"><label for="widget-notes">Bloco de notas</label></h2>
+                <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-status"></textarea>
+                <p id="notes-status" role="status">Salvo neste dispositivo</p>
+              </section>
+            </div>
+          </section>
+          <section class="home-workspace" id="home-resume" role="tabpanel" aria-labelledby="home-resume-tab" tabindex="0" hidden>
+            <h1>Retomar</h1>
+            <div class="widget-grid">
+              <section class="home-card" aria-labelledby="open-tabs-title">
+                <h2 id="open-tabs-title">Abas abertas</h2>
+                <p id="resume-open-empty">As páginas abertas aparecem aqui.</p>
+                <ul class="resume-list" id="resume-open"></ul>
+              </section>
+              <section class="home-card" aria-labelledby="closed-tabs-title">
+                <h2 id="closed-tabs-title">Fechadas recentemente</h2>
+                <p id="resume-closed-empty">As páginas que você fechar nesta sessão aparecem aqui.</p>
+                <ul class="resume-list" id="resume-closed"></ul>
+              </section>
+            </div>
+            <section class="home-card history-card" aria-labelledby="history-title">
+              <div class="history-heading">
+                <h2 id="history-title">Histórico</h2>
+                <button id="history-clear" type="button">Limpar histórico</button>
+              </div>
+              <input id="history-filter" type="search" aria-label="Pesquisar histórico" placeholder="Pesquisar histórico" autocomplete="off">
+              <div id="history-confirm" class="history-confirm" hidden>
+                <p>Apagar todo o histórico de navegação local?</p>
+                <button id="history-delete-all" type="button">Apagar histórico</button>
+                <button id="history-cancel" type="button">Cancelar</button>
+              </div>
+              <p id="history-empty" role="status" hidden></p>
+              <ul class="resume-list history-list" id="history-list"></ul>
+            </section>
+          </section>
+        </main>
+        <section id="offline-view" class="offline-view" aria-labelledby="offline-heading" hidden>
+          <header class="offline-header">
+            <div><h1 id="offline-heading">Sem conexão</h1><p>Confira a conexão ou tente carregar a página novamente.</p></div>
+            <button id="offline-retry" type="button">Tentar novamente</button>
+          </header>
+          <div class="arcade">
+            <div class="arcade-hud">
+              <h2>Sinal de Volta</h2>
+              <p>Pontos <output id="offline-score">0</output> · Recorde <output id="offline-record">0</output></p>
+            </div>
+            <canvas id="offline-game" width="540" height="184" tabindex="0" aria-label="Sinal de Volta" aria-describedby="offline-controls"></canvas>
+            <div class="arcade-controls">
+              <button id="offline-play" type="button">Jogar</button>
+              <p id="offline-controls">Use Espaço, ↑ ou toque no jogo para saltar.</p>
+            </div>
+            <p id="offline-message" role="status"></p>
+          </div>
+        </section>
+        <section id="web-search" class="home-workspace web-search" aria-labelledby="web-search-heading" hidden>
+          <h1 id="web-search-heading">Busca do Orla</h1>
+          <form id="web-search-form" class="address featured">
+            <img src="assets/search.svg" alt="">
+            <input id="web-search-query" aria-label="Pesquisar na web" type="text" autocomplete="off" maxlength="300" required>
+            <button type="submit" aria-label="Pesquisar">↵</button>
+          </form>
+          <div class="web-search-actions">
+            <button id="search-provider-toggle" type="button" aria-haspopup="dialog" aria-controls="search-provider-dialog">Configurar provedor</button>
+            <button id="search-fallback" type="button">Pesquisar no DuckDuckGo</button>
+          </div>
+          <p id="web-search-status" role="status"></p>
+          <ol id="web-search-results" class="web-search-results"></ol>
+        </section>
+      </div>
     </div>
-    <section class="home-content" id="home-start" role="tabpanel" aria-labelledby="home-start-tab" tabindex="0">
-      <h1>Nova aba</h1>
-      <button id="home-search" class="address featured" aria-haspopup="dialog"><img src="assets/search.svg" alt="">Buscar na web <span aria-hidden="true">↵</span></button>
-      <nav class="favorites" aria-label="Favoritos">
-        <p>Favoritos</p>
-        <div id="favorites-list"></div>
-        <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
-      </nav>
-    </section>
-    <section class="home-workspace" id="home-widgets" role="tabpanel" aria-labelledby="home-widgets-tab" tabindex="0" hidden>
-      <h1>Widgets</h1>
-      <div class="widget-grid">
-        <section class="home-card clock-card" aria-labelledby="clock-title">
-          <h2 id="clock-title">Hora local</h2>
-          <time id="widget-clock"></time>
-          <p id="widget-date"></p>
-        </section>
-        <section class="home-card notes-card" aria-labelledby="notes-title">
-          <h2 id="notes-title"><label for="widget-notes">Bloco de notas</label></h2>
-          <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-status"></textarea>
-          <p id="notes-status" role="status">Salvo neste dispositivo</p>
-        </section>
-      </div>
-    </section>
-    <section class="home-workspace" id="home-resume" role="tabpanel" aria-labelledby="home-resume-tab" tabindex="0" hidden>
-      <h1>Retomar</h1>
-      <div class="widget-grid">
-        <section class="home-card" aria-labelledby="open-tabs-title">
-          <h2 id="open-tabs-title">Abas abertas</h2>
-          <p id="resume-open-empty">As páginas abertas aparecem aqui.</p>
-          <ul class="resume-list" id="resume-open"></ul>
-        </section>
-        <section class="home-card" aria-labelledby="closed-tabs-title">
-          <h2 id="closed-tabs-title">Fechadas recentemente</h2>
-          <p id="resume-closed-empty">As páginas que você fechar nesta sessão aparecem aqui.</p>
-          <ul class="resume-list" id="resume-closed"></ul>
-        </section>
-      </div>
-    </section>
-  </main>
+  </div>
+  <div class="window-resize" aria-hidden="true">
+    <div data-resize="North"></div>
+    <div data-resize="NorthEast"></div>
+    <div data-resize="East"></div>
+    <div data-resize="SouthEast"></div>
+    <div data-resize="South"></div>
+    <div data-resize="SouthWest"></div>
+    <div data-resize="West"></div>
+    <div data-resize="NorthWest"></div>
+  </div>
   <p id="status" role="status" hidden></p>
-  <dialog id="search-dialog" aria-label="Pesquisar ou digitar endereço">
-    <form id="search-form">
-      <label for="query">Pesquisar ou digitar endereço</label>
-      <input id="query" type="text" autofocus autocomplete="off" spellcheck="false">
-      <button class="primary" type="submit">Abrir <kbd>Enter</kbd></button>
+  <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
+    <h2 id="downloads-heading">Downloads</h2>
+    <p id="downloads-empty">Os arquivos baixados nesta sessão aparecem aqui.</p>
+    <p id="downloads-error" role="status"></p>
+    <ul id="downloads-list"></ul>
+    <button type="button" data-dismiss>Fechar</button>
+  </dialog>
+  <dialog id="search-provider-dialog" aria-labelledby="search-provider-heading">
+    <h2 id="search-provider-heading">Provedor de busca</h2>
+    <form id="search-provider-form">
+      <label for="search-provider-url">Endereço da instância SearXNG</label>
+      <input id="search-provider-url" type="url" placeholder="https://busca.exemplo.com" maxlength="500" autocomplete="off" spellcheck="false">
+      <p>A instância precisa aceitar resultados em JSON. Ela só recebe a pesquisa enviada.</p>
+      <p id="provider-status" role="status"></p>
+      <button id="provider-test" type="button">Testar conexão</button>
+      <button type="submit">Salvar provedor</button>
       <button type="button" data-dismiss>Cancelar</button>
     </form>
-    <p>As pesquisas são enviadas ao DuckDuckGo.</p>
   </dialog>
-  <dialog id="tab-dialog" aria-labelledby="tab-heading">
-    <div class="dialog-heading"><h2 id="tab-heading">Abas</h2><button id="add-tab">Nova aba</button></div>
-    <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off" autofocus>
-    <ul id="tab-list"></ul>
-    <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
-    <div class="dialog-actions"><button id="reopen-tab" disabled>Reabrir última aba</button><button data-dismiss>Fechar</button></div>
+  <dialog id="appearance-dialog" aria-labelledby="appearance-heading">
+    <h2 id="appearance-heading">Aparência</h2>
+    <fieldset class="theme-options">
+      <legend>Tema do Orla</legend>
+      <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span> Lima</label>
+      <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span> Lavanda</label>
+      <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span> Areia</label>
+    </fieldset>
+    <label class="motion-option"><input id="appearance-motion" type="checkbox" checked> Animar fundo da Nova Aba</label>
+    <button id="settings-search" type="button">Provedor de busca</button>
+    <button type="button" data-dismiss>Fechar</button>
   </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">
     <h2 id="agent-heading">Agente</h2>

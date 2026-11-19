@@ -1,4 +1,4 @@
-export function resolveAddress(value) {
+export function resolveNavigation(value) {
   const input = value.trim();
   if (!input) throw new Error('Digite um endereço ou uma pesquisa.');
 
@@ -13,10 +13,19 @@ export function resolveAddress(value) {
   if (explicit || (!/\s/.test(input) && looksLikeHost)) {
     const url = new URL(explicit ? input : 'https://' + input);
     if (url.username || url.password) throw new Error('Use um endereço sem credenciais.');
-    return url.href;
+    return { url: url.href };
   }
 
+  return { query: input };
+}
+
+export function duckDuckGo(query) {
   const search = new URL('https://duckduckgo.com/');
-  search.searchParams.set('q', input);
+  search.searchParams.set('q', query);
   return search.href;
+}
+
+export function resolveAddress(value) {
+  const target = resolveNavigation(value);
+  return target.url ?? duckDuckGo(target.query);
 }

@@ -54,3 +54,30 @@ test('restorable addresses exclude local app origins, credentials and unsupporte
   ]) assert.equal(websiteAddress(value), '');
   assert.equal(websiteAddress('https://[::1]:8080/?q=a#b'), 'https://[::1]:8080/?q=a#b');
 });
+
+test('restores pins for valid pages and leaves older sessions unpinned', () => {
+  const tabs = ['https://example.org/', '', 'https://example.com/'];
+  assert.equal(readSession(JSON.stringify({ tabs })).pinnedIndices.size, 0);
+  const session = readSession(JSON.stringify({
+    tabs, activeIndex: 2, pinnedIndices: [2, 0, 2, 1, -1, 3, '0', null],
+  }));
+  assert.deepEqual([...session.pinnedIndices], [2, 0]);
+  assert.deepEqual(session.tabs, tabs);
+  assert.equal(session.activeIndex, 2);
+});
+
+test('restores sidebar width and collapse state without breaking existing sessions', () => {
+  assert.deepEqual(readSession('{}').sidebar, { width: 240, collapsed: false });
+  for (const [width, expected] of [[88, 184], [260.7, 261], [700, 360], ['260', 240]]) {
+    const session = readSession(JSON.stringify({ sidebar: { width, collapsed: true } }));
+    assert.deepEqual(session.sidebar, { width: expected, collapsed: true });
+  }
+});
+
+test('restores a supported theme and the background animation preference', () => {
+  assert.deepEqual(readSession('{}').appearance, { theme: 'lima', motion: true });
+  assert.deepEqual(readSession('{"appearance":{"theme":"lavanda","motion":false}}').appearance,
+    { theme: 'lavanda', motion: false });
+  assert.deepEqual(readSession('{"appearance":{"theme":"inexistente","motion":"false"}}').appearance,
+    { theme: 'lima', motion: true });
+});
