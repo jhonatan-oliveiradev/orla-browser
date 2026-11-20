@@ -9,7 +9,7 @@
 </head>
 <body>
   <header class="toolbar" aria-label="Navegação" data-tauri-drag-region>
-    <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-sidebar" aria-expanded="true"><img src="assets/tabs.svg" alt=""></button>
+    <button id="tabs-toggle" class="icon" aria-label="Abas" aria-controls="tab-sidebar" aria-expanded="true"></button>
     <div class="navigation">
       <button class="icon" data-tab-action="back" aria-label="Voltar"><img src="assets/back.svg" alt=""></button>
       <button class="icon" data-tab-action="forward" aria-label="Avançar"><img src="assets/next.svg" alt=""></button>
@@ -20,15 +20,17 @@
       <input id="address" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="address-suggestions" aria-label="Pesquisar ou digitar endereço" placeholder="Pesquisar ou digitar URL" autocomplete="off" spellcheck="false">
       <kbd aria-hidden="true">Ctrl+L</kbd>
     </form>
-    <button id="favorite-page" class="icon" aria-label="Adicionar aos favoritos" aria-pressed="false" disabled>☆</button>
-    <button id="new-tab" class="icon" aria-label="Nova aba"><img src="assets/plus.svg" alt=""></button>
-    <button id="appearance" type="button" aria-haspopup="dialog" aria-controls="appearance-dialog">Tema</button>
-    <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog"><span aria-hidden="true">↓</span></button>
-    <button id="agent" aria-haspopup="dialog">Agente</button>
+    <div class="toolbar-tools">
+      <button id="favorite-page" class="icon" aria-label="Favoritar página" aria-pressed="false" disabled></button>
+      <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
+      <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
+      <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog" aria-controls="downloads-dialog" data-static-icon="download"></button>
+      <button id="agent" class="icon" type="button" aria-label="Agente" title="Agente" aria-haspopup="dialog" aria-controls="agent-dialog" data-static-icon="agent"></button>
+    </div>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
     <div class="window-actions" aria-label="Controles da janela">
       <button class="icon" data-window-action="minimize" aria-label="Minimizar"><img src="assets/min.svg" alt=""></button>
-      <button class="icon" data-window-action="maximize" aria-label="Maximizar ou restaurar"><img src="assets/max.svg" alt=""></button>
+      <button class="icon" data-window-action="maximize" aria-label="Maximizar janela" title="Maximizar janela" data-static-icon="maximize"></button>
       <button class="icon" data-window-action="close" aria-label="Fechar janela"><img src="assets/close.svg" alt=""></button>
     </div>
   </header>
@@ -37,16 +39,19 @@
       <button id="workspace-toggle" type="button" aria-haspopup="dialog" aria-controls="workspaces-dialog">
         <span id="workspace-initial" aria-hidden="true">P</span>
         <span id="workspace-name">Principal</span>
-        <span class="workspace-indicator" aria-hidden="true">⌄</span>
+        <span class="workspace-indicator" data-static-icon="chevron" aria-hidden="true"></span>
       </button>
       <div class="sidebar-heading">
         <h2 id="tab-heading">Abas</h2>
         <button id="add-tab" class="icon" type="button" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
       </div>
-      <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off">
+      <div class="tab-filter-field">
+        <span data-static-icon="search" aria-hidden="true"></span>
+        <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off">
+      </div>
       <ul id="tab-list"></ul>
       <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
-      <button id="reopen-tab" type="button" disabled>Reabrir última aba</button>
+      <button id="reopen-tab" type="button" data-static-icon="reopen" title="Reabrir última aba (Ctrl+Shift+T)" disabled>Reabrir última aba</button>
       <div id="tab-preview" class="tab-preview" role="tooltip" hidden>
         <img id="tab-preview-image" alt="" hidden>
         <div class="tab-preview-content">
@@ -78,7 +83,7 @@
             <form id="home-search-form" class="address featured">
               <img src="assets/search.svg" alt="">
               <input id="home-search" type="text" aria-label="Buscar na web" placeholder="Buscar na web" autocomplete="off" spellcheck="false">
-              <button type="submit" aria-label="Pesquisar">↵</button>
+              <button type="submit" aria-label="Pesquisar" title="Pesquisar" data-static-icon="forward"></button>
             </form>
             <nav class="favorites" aria-label="Favoritos">
               <p>Favoritos</p>
@@ -143,7 +148,7 @@
             </div>
             <canvas id="offline-game" width="576" height="224" tabindex="0" aria-label="Sinal de Volta" aria-describedby="offline-controls"></canvas>
             <div class="arcade-controls">
-              <button id="offline-play" type="button">Jogar</button>
+              <button id="offline-play" type="button"><span id="offline-play-label">Jogar</span></button>
               <p id="offline-controls">Use Espaço, ↑ ou toque no jogo para saltar.</p>
             </div>
             <p id="offline-message" role="status"></p>
@@ -154,7 +159,7 @@
           <form id="web-search-form" class="address featured">
             <img src="assets/search.svg" alt="">
             <input id="web-search-query" aria-label="Pesquisar na web" type="text" autocomplete="off" maxlength="300" required>
-            <button type="submit" aria-label="Pesquisar">↵</button>
+            <button type="submit" aria-label="Pesquisar" title="Pesquisar" data-static-icon="forward"></button>
           </form>
           <div class="web-search-actions">
             <button id="search-provider-toggle" type="button" aria-haspopup="dialog" aria-controls="search-provider-dialog">Configurar provedor</button>
@@ -180,7 +185,7 @@
   <dialog id="workspaces-dialog" aria-labelledby="workspaces-heading">
     <header class="workspaces-heading">
       <h2 id="workspaces-heading">Espaços de trabalho</h2>
-      <button type="button" data-dismiss aria-label="Fechar espaços de trabalho">×</button>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar espaços de trabalho" title="Fechar" data-static-icon="close"></button>
     </header>
     <ul id="workspaces-list"></ul>
     <form id="workspace-create-form" class="workspace-form">

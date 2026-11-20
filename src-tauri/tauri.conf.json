@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "identifier": "app.orlabrowser.desktop",
   "build": {
+    "beforeDevCommand": { "script": "npm run prepare:ui", "wait": true },
+    "beforeBuildCommand": "npm run prepare:ui",
     "frontendDist": "../ui"
   },
   "app": {

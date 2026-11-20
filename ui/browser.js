@@ -1,6 +1,7 @@
 import { duckDuckGo, resolveNavigation } from './address.js';
 import { initDownloads } from './downloads.js';
 import { initOffline } from './offline.js';
+import { releaseIcon, setIcon } from './icons.js';
 import { initAppearance } from './appearance.js';
 import { addVisit, HISTORY_KEY, matchesPage, pageTitle, readHistory, suggestPages } from './history.js';
 import { initOmnibox } from './omnibox.js';
@@ -127,9 +128,8 @@ function render() {
   const label = saved ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
   favoriteButton.disabled = !tab.url;
   favoriteButton.setAttribute('aria-pressed', String(saved));
-  favoriteButton.setAttribute('aria-label', label);
   favoriteButton.title = label;
-  favoriteButton.textContent = saved ? '★' : '☆';
+  setIcon(favoriteButton, saved ? 'starred' : 'star');
 }
 
 function renderFavorites() {
@@ -138,7 +138,17 @@ function renderFavorites() {
   byId('favorites-empty').hidden = favorites.size > 0;
   for (const [url, title] of favorites) {
     const button = document.createElement('button');
-    button.textContent = title;
+    const mark = document.createElement('span');
+    mark.className = 'favorite-mark';
+    mark.setAttribute('aria-hidden', 'true');
+    mark.textContent = Array.from(title)[0].toLocaleUpperCase('pt-BR');
+    const text = document.createElement('span');
+    const name = document.createElement('strong');
+    name.textContent = title;
+    const host = document.createElement('small');
+    host.textContent = new URL(url).hostname.replace(/^www\./, '');
+    text.append(name, host);
+    button.append(mark, text);
     button.title = url;
     button.addEventListener('click', () => schedule(() => go(url)));
     list.append(button);
@@ -351,80 +361,129 @@ function resetTabPreview(tab) {
   delete tab.ready;
 }
 
-function refreshTabList() {
-  const focused = document.activeElement;
-  const target = focused?.closest('#tab-list button')?.dataset.focusKey;
+const tabRows = new Map();
+
+function buildTabRow(id) {
+  const row = document.createElement('li');
+  const select = document.createElement('button');
+  select.className = 'tab-select';
+  select.dataset.tabId = String(id);
+  select.dataset.focusKey = 'select-' + id;
+  const mark = document.createElement('span');
+  mark.className = 'tab-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  const text = document.createElement('span');
+  text.className = 'tab-title';
+  select.append(mark, text);
+  select.addEventListener('click', () => {
+    closeTabPreview();
+    schedule(() => selectTab(id));
+  });
+  select.addEventListener('pointerenter', (event) => {
+    if (event.pointerType !== 'touch') queueTabPreview(select);
+  });
+  select.addEventListener('pointerleave', () => {
+    if (previewTarget === select) closeTabPreview();
+  });
+  select.addEventListener('focus', () => {
+    if (select.matches(':focus-visible')) queueTabPreview(select);
+  });
+  select.addEventListener('blur', () => {
+    if (previewTarget === select) closeTabPreview();
+  });
+  select.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && previewTarget === select) closeTabPreview();
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'tab-actions';
+  const pin = document.createElement('button');
+  pin.className = 'icon';
+  pin.dataset.pin = String(id);
+  pin.dataset.focusKey = 'pin-' + id;
+  pin.addEventListener('click', () => schedule(() => togglePin(id)));
+  const close = document.createElement('button');
+  close.className = 'icon';
+  close.dataset.focusKey = 'close-' + id;
+  close.addEventListener('click', () => schedule(() => closeTab(id)));
+  setIcon(close, 'close');
+  actions.append(pin, close);
+  row.append(select, actions);
+  const parts = { row, select, mark, text, actions, pin, close };
+  tabRows.set(id, parts);
+  return parts;
+}
+
+function togglePin(id) {
+  const tab = tabs.get(id);
+  if (tab?.workspaceId !== activeWorkspace.id || !tab.url) return;
+  const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const positions = new Map();
+  if (animate) {
+    for (const row of tabList.children) {
+      positions.set(row, row.getBoundingClientRect().top);
+      for (const animation of row.getAnimations()) animation.cancel();
+    }
+  }
+  tab.pinned = !tab.pinned;
+  saveSession();
+  refreshTabList(id);
+  for (const [row, top] of positions) {
+    const delta = top - row.getBoundingClientRect().top;
+    if (row.isConnected && delta) {
+      row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], {
+        duration: 180, easing: 'cubic-bezier(.2,.75,.25,1)',
+      });
+    }
+  }
+}
+
+function refreshTabList(animatedPinId) {
+  const target = document.activeElement?.closest('#tab-list button')?.dataset.focusKey;
   const scroll = tabList.scrollTop;
+  const visible = new Set();
   closeTabPreview();
-  tabList.replaceChildren();
   reopenButton.disabled = !activeWorkspace.recentlyClosed.length;
-  const filter = sidebarSettings.collapsed ? '' : (tabFilter.value || '').trim().toLocaleLowerCase('pt-BR');
+  const filter = sidebarSettings.collapsed ? '' : tabFilter.value.trim().toLocaleLowerCase('pt-BR');
+  let index = 0;
   for (const [id, tab] of orderedTabs()) {
     if (sidebarSettings.collapsed && id !== activeWorkspace.activeId) continue;
     const title = tab.url ? tab.title || new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba';
-    if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter)
-      && !tab.url.toLowerCase().includes(filter)) continue;
-
-    const row = document.createElement('li');
+    if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter) && !tab.url.toLowerCase().includes(filter)) continue;
+    const { row, select, mark, text, actions, pin, close } = tabRows.get(id) ?? buildTabRow(id);
+    visible.add(id);
     row.dataset.pinned = String(tab.pinned);
-    const select = document.createElement('button');
-    select.textContent = sidebarSettings.collapsed ? Array.from(title)[0].toUpperCase() : title;
-    select.dataset.tabId = String(id);
-    if (!tab.url) select.title = title;
+    row.dataset.active = String(id === activeWorkspace.activeId);
     select.setAttribute('aria-label', title);
-    select.dataset.focusKey = 'select-' + id;
     if (id === activeWorkspace.activeId) select.setAttribute('aria-current', 'true');
-    select.addEventListener('click', () => {
-      closeTabPreview();
-      schedule(() => selectTab(id));
-    });
-    select.addEventListener('pointerenter', (event) => {
-      if (event.pointerType !== 'touch') queueTabPreview(select);
-    });
-    select.addEventListener('pointerleave', () => {
-      if (previewTarget === select) closeTabPreview();
-    });
-    select.addEventListener('focus', () => {
-      if (select.matches(':focus-visible')) queueTabPreview(select);
-    });
-    select.addEventListener('blur', () => {
-      if (previewTarget === select) closeTabPreview();
-    });
-    select.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && previewTarget === select) closeTabPreview();
-    });
-
-    const close = document.createElement('button');
-    close.textContent = '×';
-    close.dataset.focusKey = 'close-' + id;
+    else select.removeAttribute('aria-current');
+    if (!tab.url || sidebarSettings.collapsed) select.title = title;
+    else select.removeAttribute('title');
+    setIcon(mark, tab.url ? 'globe' : tab.webSearch ? 'search' : 'page');
+    text.textContent = title;
+    pin.hidden = !tab.url;
+    actions.hidden = sidebarSettings.collapsed;
+    setIcon(pin, tab.pinned ? 'pinned' : 'pin', id === animatedPinId);
+    pin.setAttribute('aria-label', 'Fixar aba ' + title);
+    pin.setAttribute('aria-pressed', String(tab.pinned));
+    pin.title = tab.pinned ? 'Desafixar aba' : 'Fixar aba';
     close.setAttribute('aria-label', 'Fechar aba ' + title);
-    close.addEventListener('click', () => schedule(() => closeTab(id)));
-    row.append(select);
-    if (tab.url && !sidebarSettings.collapsed) {
-      const pin = document.createElement('button');
-      const label = tab.pinned ? 'Desafixar' : 'Fixar';
-      pin.textContent = label;
-      pin.dataset.pin = String(id);
-      pin.dataset.focusKey = 'pin-' + id;
-      pin.setAttribute('aria-label', label + ' aba ' + title);
-      pin.addEventListener('click', () => schedule(() => {
-        if (tabs.get(id)?.workspaceId !== activeWorkspace.id) return;
-        tab.pinned = !tab.pinned;
-        saveSession();
-        refreshTabList();
-        tabList.querySelector(`[data-pin="${id}"]`)?.focus();
-      }));
-      row.append(pin);
-    }
-    if (!sidebarSettings.collapsed) row.append(close);
-    tabList.append(row);
+    close.title = 'Fechar aba';
+    const slot = tabList.children[index++];
+    if (slot !== row) tabList.insertBefore(row, slot ?? null);
   }
-  byId('tabs-empty').hidden = tabList.childElementCount > 0;
+  for (const [id, { row, pin }] of tabRows) {
+    if (visible.has(id)) continue;
+    releaseIcon(pin);
+    row.remove();
+    tabRows.delete(id);
+  }
+  byId('tabs-empty').hidden = visible.size > 0;
   tabList.scrollTop = scroll;
   if (target) {
-    const next = tabList.querySelector(`[data-focus-key="${target}"]`)
+    const next = tabList.querySelector(`[data-focus-key="${target}"]:not([hidden])`)
       ?? tabList.querySelector('[aria-current="true"]') ?? tabFilter;
-    next.focus({ preventScroll: true });
+    if (next !== document.activeElement) next.focus({ preventScroll: true });
   }
 }
 
@@ -623,6 +682,7 @@ favoriteButton.addEventListener('click', () => {
   else favorites.set(url, new URL(url).hostname);
   saveSession();
   renderFavorites();
+  setIcon(favoriteButton, favorites.has(url) ? 'starred' : 'star', true);
   render();
 });
 
@@ -631,9 +691,32 @@ for (const button of document.querySelectorAll('[data-tab-action]')) {
 }
 if (tauri?.window) {
   const frame = tauri.window.getCurrentWindow();
+  const maximizeButton = document.querySelector('[data-window-action="maximize"]');
+  let resizeTimer;
+  let stateVersion = 0;
+
+  async function updateMaximizeIcon(animate = true) {
+    const version = ++stateVersion;
+    const maximized = await frame.isMaximized();
+    if (version !== stateVersion) return;
+    const label = maximized ? 'Restaurar janela' : 'Maximizar janela';
+    maximizeButton.setAttribute('aria-label', label);
+    maximizeButton.title = label;
+    setIcon(maximizeButton, maximized ? 'restore' : 'maximize', animate);
+  }
+
+  setIcon(maximizeButton, 'maximize');
+  updateMaximizeIcon(false).catch(showError);
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => updateMaximizeIcon().catch(showError), 90);
+  });
   for (const [action, run] of [
     ['minimize', () => frame.minimize()],
-    ['maximize', () => frame.toggleMaximize()],
+    ['maximize', async () => {
+      await frame.toggleMaximize();
+      await updateMaximizeIcon();
+    }],
     ['close', () => frame.close()],
   ]) {
     document.querySelector(`[data-window-action="${action}"]`)
@@ -807,12 +890,18 @@ initAppearance(appearance, (settings) => {
   saveSession();
 });
 
+for (const element of document.querySelectorAll('[data-static-icon]')) {
+  if (!element.dataset.iconState) setIcon(element, element.dataset.staticIcon);
+}
+const sidebarToggle = byId('tabs-toggle');
+setIcon(sidebarToggle, sidebarSettings.collapsed ? 'sidebarClosed' : 'sidebar');
 initSidebar({
   ...sidebarSettings,
   onChange(settings) {
     const changedMode = settings.collapsed !== sidebarSettings.collapsed;
     sidebarSettings = settings;
     if (changedMode) {
+      setIcon(sidebarToggle, settings.collapsed ? 'sidebarClosed' : 'sidebar', true);
       tabFilter.value = '';
       refreshTabList();
     }
