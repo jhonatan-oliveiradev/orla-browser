@@ -1,6 +1,7 @@
 import { duckDuckGo, resolveNavigation } from './address.js';
 import { readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
+import { initDevTools } from './devtools.js';
 import { initDownloads } from './downloads.js';
 import { initOffline } from './offline.js';
 import { releaseIcon, setIcon } from './icons.js';
@@ -135,9 +136,11 @@ function saveSession() {
 
 const showOffline = initOffline();
 const downloads = initDownloads(invoke);
+const devtools = initDevTools(invoke, scheduleLayout);
 
 function render() {
   const tab = tabs.get(activeWorkspace.activeId);
+  devtools.setPage(tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null);
   workspaceControls.renderCurrent(activeWorkspace.name);
   if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
   byId('notes-workspace').textContent = activeWorkspace.name;
@@ -950,6 +953,7 @@ address.addEventListener('keydown', (event) => {
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'devtools': devtools.toggle(); return true;
     case 'address':
       omnibox.close();
       address.focus();
@@ -963,7 +967,15 @@ function runShortcut(action) {
 }
 
 document.addEventListener('keydown', (event) => {
-  if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat || event.isComposing) return;
+  if (event.altKey || event.metaKey || event.isComposing) return;
+  const isDevTools = (event.key === 'F12' && !event.ctrlKey && !event.shiftKey)
+    || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'i');
+  if (isDevTools) {
+    event.preventDefault();
+    if (!event.repeat) runShortcut('devtools');
+    return;
+  }
+  if (!event.ctrlKey || event.repeat) return;
   const action = (event.shiftKey
     ? { t: 'reopen-tab' }
     : { l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
@@ -1046,6 +1058,7 @@ if (tauri) {
         return;
       }
       if (payload.finished) {
+        devtools.navigated(id);
         tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();
@@ -1087,6 +1100,7 @@ if (tauri) {
     }));
     await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
     await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
+    await tauri.event.listen('orla-devtools', ({ payload }) => devtools.handle(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();
   });

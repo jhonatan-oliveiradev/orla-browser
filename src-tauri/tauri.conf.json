@@ -19,6 +19,7 @@
         "minWidth": 460,
         "minHeight": 440,
         "decorations": false,
+        "devtools": false,
         "resizable": true,
         "shadow": true
       }

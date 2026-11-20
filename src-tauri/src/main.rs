@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(windows)]
+mod devtools;
+#[cfg(windows)]
 mod shortcuts;
 #[cfg(windows)]
 mod site_events;
@@ -195,6 +197,14 @@ mod site_events {
     }
 }
 
+#[cfg(not(windows))]
+mod devtools {
+    #[tauri::command]
+    pub fn devtools_action() -> Result<serde_json::Value, String> {
+        Err("DevTools está disponível no Windows.".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -202,6 +212,7 @@ fn main() {
             show_tab,
             resize_tabs,
             tab_action,
+            devtools::devtools_action,
             site_events::download_action,
             site_events::tab_preview,
             search::search_web

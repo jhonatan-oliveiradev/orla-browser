@@ -126,6 +126,9 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
     use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_4;
     use windows_core::Interface;
 
+    if let Err(error) = crate::devtools::register(core, &app, &id) {
+        eprintln!("Não foi possível registrar a captura do DevTools: {error}");
+    }
     let latest = Rc::new(RefCell::new((0u64, String::new())));
     let start = {
         let latest = latest.clone();

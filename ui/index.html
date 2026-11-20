@@ -25,6 +25,7 @@
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
       <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
       <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog" aria-controls="downloads-dialog" data-static-icon="download"></button>
+      <button id="devtools-toggle" class="icon" type="button" aria-label="DevTools" title="DevTools (F12)" aria-expanded="false" aria-controls="devtools-panel" aria-keyshortcuts="F12 Control+Shift+I" data-static-icon="devtools"></button>
       <button id="agent" class="icon" type="button" aria-label="Agente" title="Agente" aria-haspopup="dialog" aria-controls="agent-dialog" data-static-icon="agent"></button>
     </div>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
@@ -188,6 +189,63 @@
           <ol id="web-search-results" class="web-search-results"></ol>
         </section>
       </div>
+      <section id="devtools-panel" class="devtools" aria-labelledby="devtools-heading" hidden>
+        <div id="devtools-divider" class="devtools-divider" role="separator" tabindex="0" aria-label="Altura do painel DevTools"
+          aria-controls="devtools-panel" aria-orientation="horizontal" aria-valuemin="150" aria-valuemax="410" aria-valuenow="260"></div>
+        <header class="devtools-header">
+          <h2 id="devtools-heading">DevTools</h2>
+          <small id="devtools-site"></small>
+          <div class="devtools-tabs" role="tablist" aria-label="Painéis do DevTools">
+            <button id="devtools-tab-elements" type="button" role="tab" aria-selected="true" aria-controls="devtools-elements" data-devtools-section="elements">Elementos</button>
+            <button id="devtools-tab-console" type="button" role="tab" aria-selected="false" aria-controls="devtools-console" tabindex="-1" data-devtools-section="console">Console</button>
+            <button id="devtools-tab-network" type="button" role="tab" aria-selected="false" aria-controls="devtools-network" tabindex="-1" data-devtools-section="network">Rede</button>
+          </div>
+          <button id="devtools-close" class="icon" type="button" title="Fechar DevTools" aria-label="Fechar DevTools" data-static-icon="close"></button>
+        </header>
+        <p id="devtools-status" role="status"></p>
+        <section id="devtools-elements" class="devtools-elements" role="tabpanel" aria-labelledby="devtools-tab-elements">
+          <div class="devtools-column">
+            <div class="devtools-actions">
+              <button id="devtools-refresh" type="button" data-requires-devtools disabled>Atualizar DOM</button>
+            </div>
+            <ul id="devtools-tree" class="devtools-tree" aria-label="Elementos da página"></ul>
+          </div>
+          <div class="devtools-column">
+            <div class="devtools-actions">
+              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos computados" placeholder="Filtrar estilos computados">
+            </div>
+            <p id="devtools-style-empty">Selecione um elemento para ver seus estilos.</p>
+            <dl id="devtools-styles"></dl>
+          </div>
+        </section>
+        <section id="devtools-console" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-console" hidden>
+          <div class="devtools-actions">
+            <button id="devtools-clear-console" type="button">Limpar console</button>
+          </div>
+          <div class="devtools-scroll">
+            <p id="devtools-console-empty">As mensagens da página aparecem aqui.</p>
+            <ul id="devtools-console-list" aria-label="Mensagens do console"></ul>
+          </div>
+          <form id="devtools-console-form" class="devtools-actions">
+            <input id="devtools-expression" type="text" autocomplete="off" spellcheck="false" maxlength="4096"
+              aria-label="Expressão JavaScript" placeholder="Expressão JavaScript na aba ativa" data-requires-devtools disabled>
+            <button type="submit" data-requires-devtools disabled>Executar</button>
+          </form>
+        </section>
+        <section id="devtools-network" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-network" hidden>
+          <div class="devtools-actions">
+            <input id="devtools-network-filter" type="search" aria-label="Filtrar requisições" placeholder="Filtrar requisições">
+            <button id="devtools-clear-network" type="button">Limpar rede</button>
+          </div>
+          <div class="devtools-scroll">
+            <p id="devtools-network-empty">Recarregue a página para capturar as requisições.</p>
+            <table aria-label="Requisições de rede">
+              <thead><tr><th>Método</th><th>Status</th><th>Tipo</th><th>URL</th></tr></thead>
+              <tbody id="devtools-requests"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
     </div>
   </div>
   <div class="window-resize" aria-hidden="true">
