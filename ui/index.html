@@ -26,6 +26,7 @@
       <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
       <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog" aria-controls="downloads-dialog" data-static-icon="download"></button>
       <button id="devtools-toggle" class="icon" type="button" aria-label="DevTools" title="DevTools (F12)" aria-expanded="false" aria-controls="devtools-panel" aria-keyshortcuts="F12 Control+Shift+I" data-static-icon="devtools"></button>
+      <button id="extensions-toggle" class="icon" type="button" aria-label="Extensões" title="Extensões" aria-haspopup="dialog" aria-controls="extensions-dialog" data-static-icon="extensions"></button>
       <button id="agent" class="icon" type="button" aria-label="Agente" title="Agente" aria-haspopup="dialog" aria-controls="agent-dialog" data-static-icon="agent"></button>
     </div>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
@@ -64,7 +65,21 @@
       <div id="sidebar-divider" role="separator" aria-label="Largura da barra de abas" aria-orientation="vertical" aria-controls="tab-sidebar" tabindex="0"></div>
     </aside>
     <div id="site-stage" class="site-stage">
-      <ul id="address-suggestions" class="address-suggestions" role="listbox" aria-label="Sugestões locais" hidden></ul>
+      <div class="stage-controls">
+        <ul id="address-suggestions" class="address-suggestions" role="listbox" aria-label="Sugestões locais" hidden></ul>
+        <div id="session-recovery" class="session-recovery" hidden>
+          <p role="status">Restauramos a última cópia disponível das suas abas e espaços.</p>
+          <button id="session-recovery-dismiss" type="button">Dispensar</button>
+        </div>
+        <form id="find-bar" role="search" aria-label="Buscar nesta página" hidden>
+          <span data-static-icon="search" aria-hidden="true"></span>
+          <input id="find-query" type="search" aria-label="Texto para localizar" placeholder="Buscar nesta página" maxlength="1024" autocomplete="off" spellcheck="false">
+          <output id="find-status" aria-live="polite"></output>
+          <button id="find-prev" class="icon" type="button" aria-label="Ocorrência anterior" title="Anterior (Shift+Enter)" data-static-icon="up"></button>
+          <button id="find-next" class="icon" type="submit" aria-label="Próxima ocorrência" title="Próxima (Enter)" data-static-icon="down"></button>
+          <button id="find-close" class="icon" type="button" aria-label="Fechar busca na página" title="Fechar (Esc)" data-static-icon="close"></button>
+        </form>
+      </div>
       <div id="site-viewport" class="site-viewport">
         <main id="home">
           <div class="home-art" aria-hidden="true">
@@ -305,7 +320,7 @@
   </dialog>
   <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
     <h2 id="downloads-heading">Downloads</h2>
-    <p id="downloads-empty">Os arquivos baixados nesta sessão aparecem aqui.</p>
+    <p id="downloads-empty">Seus downloads aparecem aqui, inclusive após reiniciar o Orla.</p>
     <p id="downloads-error" role="status"></p>
     <ul id="downloads-list"></ul>
     <button type="button" data-dismiss>Fechar</button>
@@ -323,16 +338,48 @@
     </form>
   </dialog>
   <dialog id="appearance-dialog" aria-labelledby="appearance-heading">
-    <h2 id="appearance-heading">Aparência</h2>
+    <header class="dialog-heading">
+      <h2 id="appearance-heading">Aparência</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar aparência" data-static-icon="close"></button>
+    </header>
     <fieldset class="theme-options">
-      <legend>Tema do Orla</legend>
-      <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span> Lima</label>
-      <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span> Lavanda</label>
-      <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span> Areia</label>
+      <legend>Paleta</legend>
+      <div class="theme-grid">
+        <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span>Lima</label>
+        <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span>Lavanda</label>
+        <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span>Areia</label>
+        <label><input type="radio" name="theme" value="oceano"><span class="theme-swatch" aria-hidden="true"></span>Oceano</label>
+        <label><input type="radio" name="theme" value="grafite"><span class="theme-swatch" aria-hidden="true"></span>Grafite</label>
+      </div>
     </fieldset>
-    <label class="motion-option"><input id="appearance-motion" type="checkbox" checked> Animar fundo da Nova Aba</label>
-    <button id="settings-search" type="button">Provedor de busca</button>
-    <button type="button" data-dismiss>Fechar</button>
+    <div class="setting-row">
+      <label for="appearance-accent">Cor de destaque</label>
+      <input id="appearance-accent" type="color" aria-describedby="appearance-accent-hint">
+      <button id="appearance-reset-accent" type="button">Restaurar cor</button>
+    </div>
+    <p id="appearance-accent-hint" class="collection-status" role="status"></p>
+    <label class="setting-row"><span>Interface compacta</span><input id="appearance-compact" type="checkbox"></label>
+    <label class="setting-row"><span>Painéis opacos</span><input id="appearance-solid" type="checkbox"></label>
+    <label class="setting-row"><span>Animar fundo da Nova Aba</span><input id="appearance-motion" type="checkbox" checked></label>
+    <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
+  </dialog>
+  <dialog id="extensions-dialog" aria-labelledby="extensions-heading">
+    <header class="dialog-heading">
+      <h2 id="extensions-heading">Extensões</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar extensões" data-static-icon="close"></button>
+    </header>
+    <ul id="extensions-list"></ul>
+    <p id="extensions-empty">Nenhuma extensão instalada.</p>
+    <form id="extension-form" class="workspace-form">
+      <label for="extension-path">Pasta da extensão descompactada</label>
+      <div class="workspace-fields">
+        <input id="extension-path" type="text" required placeholder="Selecione ou cole o caminho da pasta" aria-describedby="extension-help" spellcheck="false" autocomplete="off">
+        <button id="extension-browse" type="button">Escolher pasta</button>
+        <button class="primary" type="submit">Adicionar</button>
+      </div>
+      <p id="extension-help">Use uma pasta confiável com <code>manifest.json</code> na raiz e mantenha os arquivos no local. Algumas extensões dependem de menus ou pop-ups do Chrome.</p>
+    </form>
+    <p id="extensions-status" class="collection-status" role="status"></p>
   </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">
     <h2 id="agent-heading">Agente</h2>

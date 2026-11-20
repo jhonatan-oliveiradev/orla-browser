@@ -2,6 +2,8 @@ import { duckDuckGo, resolveNavigation } from './address.js';
 import { readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
 import { initDevTools } from './devtools.js';
+import { initExtensions } from './extensions.js';
+import { initFind } from './find.js';
 import { initDownloads } from './downloads.js';
 import { initOffline } from './offline.js';
 import { releaseIcon, setIcon } from './icons.js';
@@ -11,7 +13,7 @@ import { initOmnibox } from './omnibox.js';
 import { initWebSearch, providerAddress } from './web-search.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
-import { LEGACY_NOTE_KEY, readSavedProject, readSession, SESSION_KEY, websiteAddress, workspaceNotes } from './session.js';
+import { LEGACY_NOTE_KEY, readSavedProject, readSession, saveSnapshot, SESSION_BACKUP_KEY, SESSION_KEY, websiteAddress, workspaceNotes } from './session.js';
 import { initWorkspaces } from './workspaces.js';
 
 const tauri = window.__TAURI__;
@@ -38,18 +40,20 @@ const notesInput = byId('widget-notes');
 const notesStatus = byId('notes-status');
 
 let snapshot = null;
+let backup = null;
 let history = [];
 let legacyNote;
 try {
   if (tauri) {
     snapshot = localStorage.getItem(SESSION_KEY);
+    backup = localStorage.getItem(SESSION_BACKUP_KEY);
     legacyNote = localStorage.getItem(LEGACY_NOTE_KEY);
     history = readHistory(localStorage.getItem(HISTORY_KEY));
   }
 } catch {
   // Navigation remains available if the WebView storage cannot be read.
 }
-const session = readSession(snapshot, legacyNote);
+const session = readSession(snapshot, legacyNote, backup);
 const projects = session.projects;
 const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
@@ -82,8 +86,8 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
-function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0 }) {
-  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed: [] };
+function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [] }) {
+  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed };
   workspaces.set(id, workspace);
   const pinned = new Set(pinnedIndices);
   for (const [index, url] of urls.entries()) {
@@ -114,9 +118,9 @@ function saveSession() {
   try {
     const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
     for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId }) => ({
-        id, name, notes, ...serializeTabs(groups.get(id), activeId),
+    saveSnapshot(localStorage, {
+      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed }) => ({
+        id, name, notes, recentlyClosed, ...serializeTabs(groups.get(id), activeId),
       })),
       projects,
       activeWorkspaceId: activeWorkspace.id,
@@ -124,7 +128,7 @@ function saveSession() {
       sidebar: sidebarSettings,
       appearance,
       searchProvider,
-    }));
+    });
     storageFailed = false;
     return true;
   } catch {
@@ -136,11 +140,18 @@ function saveSession() {
 
 const showOffline = initOffline();
 const downloads = initDownloads(invoke);
+const extensions = initExtensions(invoke);
+const find = initFind(invoke, (focusId) => {
+  if (focusId !== undefined) schedule(() => syncView(focusId));
+  else scheduleLayout();
+});
 const devtools = initDevTools(invoke, scheduleLayout);
 
 function render() {
   const tab = tabs.get(activeWorkspace.activeId);
-  devtools.setPage(tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null);
+  const page = tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null;
+  devtools.setPage(page);
+  find.setPage(page);
   workspaceControls.renderCurrent(activeWorkspace.name);
   if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
   byId('notes-workspace').textContent = activeWorkspace.name;
@@ -767,6 +778,10 @@ for (const button of document.querySelectorAll('[data-dismiss]')) {
 }
 byId('downloads-toggle').addEventListener('click', () => openDialog(byId('downloads-dialog')));
 byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeWorkspace.activeId).url)));
+byId('extensions-toggle').addEventListener('click', () => {
+  openDialog(byId('extensions-dialog'));
+  void extensions.load();
+});
 byId('appearance').addEventListener('click', () => openDialog(byId('appearance-dialog')));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
@@ -953,6 +968,9 @@ address.addEventListener('keydown', (event) => {
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'find':
+      omnibox.close();
+      return find.open();
     case 'devtools': devtools.toggle(); return true;
     case 'address':
       omnibox.close();
@@ -978,7 +996,7 @@ document.addEventListener('keydown', (event) => {
   if (!event.ctrlKey || event.repeat) return;
   const action = (event.shiftKey
     ? { t: 'reopen-tab' }
-    : { l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
+    : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
   if (runShortcut(action)) event.preventDefault();
 });
 
@@ -1030,6 +1048,13 @@ initSidebar({
   onResize: scheduleLayout,
 });
 renderFavorites();
+if (session.recovered) {
+  byId('session-recovery').hidden = false;
+  saveSession();
+}
+byId('session-recovery-dismiss').addEventListener('click', () => {
+  byId('session-recovery').hidden = true;
+});
 projectControls.render();
 render();
 refreshTabList();
@@ -1059,6 +1084,7 @@ if (tauri) {
       }
       if (payload.finished) {
         devtools.navigated(id);
+        find.navigated(id);
         tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();
@@ -1100,6 +1126,13 @@ if (tauri) {
     }));
     await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
     await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
+    await tauri.event.listen('orla-find', ({ payload }) => find.receive(payload));
+    try {
+      const previous = await invoke('download_history');
+      for (const item of previous || []) downloads.restore(item);
+    } catch (error) {
+      downloads.reportError(error);
+    }
     await tauri.event.listen('orla-devtools', ({ payload }) => devtools.handle(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();

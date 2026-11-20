@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc, sync::atomic::{AtomicU32, Ordering}};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Webview};
+use tauri::{async_runtime::channel, AppHandle, Emitter, Manager, Webview};
 use webview2_com::{
     Microsoft::Web::WebView2::Win32::*, take_pwstr, BytesReceivedChangedEventHandler,
     CallDevToolsProtocolMethodCompletedHandler, ExecuteScriptCompletedHandler,
@@ -93,21 +93,32 @@ pub async fn tab_preview(
     }).map_err(as_message)
 }
 
-#[derive(Clone, Serialize)]
-struct DownloadProgress {
-    id: u32,
-    name: String,
-    received: i64,
-    total: i64,
-    state: &'static str,
-}
+use crate::download_store::{Progress, Store};
 
 thread_local! {
     // WebView2 operations are confined to their owning UI thread.
     static RUNNING: RefCell<HashMap<u32, ICoreWebView2DownloadOperation>> = RefCell::default();
-    static COMPLETED: RefCell<HashMap<u32, PathBuf>> = RefCell::default();
+    static DOWNLOADS: RefCell<Option<Store>> = const { RefCell::new(None) };
 }
-static NEXT_DOWNLOAD: AtomicU32 = AtomicU32::new(1);
+static FALLBACK_DOWNLOAD: AtomicU32 = AtomicU32::new(1 << 31);
+
+fn with_downloads<T>(app: &AppHandle, operation: impl FnOnce(&mut Store) -> Result<T, String>) -> Result<T, String> {
+    DOWNLOADS.with_borrow_mut(|cached| {
+        if cached.is_none() { *cached = Some(Store::open(app)?); }
+        operation(cached.as_mut().unwrap())
+    })
+}
+
+#[tauri::command]
+pub async fn download_history(caller: Webview, app: AppHandle) -> Result<Vec<Progress>, String> {
+    ui_only(&caller)?;
+    let (send, mut receive) = channel(1);
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = send.try_send(with_downloads(&handle, |store| Ok(store.list())));
+    }).map_err(as_message)?;
+    receive.recv().await.ok_or("O histórico de downloads está indisponível.")?
+}
 
 pub fn attach(view: &Webview) -> CommandResult {
     let id = view.label().to_owned();
@@ -129,6 +140,7 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
     if let Err(error) = crate::devtools::register(core, &app, &id) {
         eprintln!("Não foi possível registrar a captura do DevTools: {error}");
     }
+    crate::find::register(core, &app, &id);
     let latest = Rc::new(RefCell::new((0u64, String::new())));
     let start = {
         let latest = latest.clone();
@@ -202,7 +214,8 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
     let downloads = DownloadStartingEventHandler::create(Box::new(move |_, args| {
         let Some(args) = args else { return Ok(()) };
         let operation = unsafe { args.DownloadOperation()? };
-        let id = NEXT_DOWNLOAD.fetch_add(1, Ordering::Relaxed);
+        let id = with_downloads(&app, |store| Ok(store.allocate()))
+            .unwrap_or_else(|_| FALLBACK_DOWNLOAD.fetch_add(1, Ordering::Relaxed));
         let mut token = 0;
         let bytes_changed = {
             let app = app.clone();
@@ -252,15 +265,7 @@ fn report(app: &AppHandle, id: u32, operation: &ICoreWebView2DownloadOperation) 
         operation.State(&mut state)?;
     }
     let status = match state {
-        COREWEBVIEW2_DOWNLOAD_STATE_COMPLETED => {
-            COMPLETED.with_borrow_mut(|completed| {
-                if completed.len() >= 100 {
-                    if let Some(first) = completed.keys().min().copied() { completed.remove(&first); }
-                }
-                completed.insert(id, path.clone());
-            });
-            "completed"
-        }
+        COREWEBVIEW2_DOWNLOAD_STATE_COMPLETED => "completed",
         COREWEBVIEW2_DOWNLOAD_STATE_INTERRUPTED => {
             let mut reason = Default::default();
             unsafe { operation.InterruptReason(&mut reason)? };
@@ -272,7 +277,11 @@ fn report(app: &AppHandle, id: u32, operation: &ICoreWebView2DownloadOperation) 
         RUNNING.with_borrow_mut(|running| { running.remove(&id); });
     }
     let name = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_else(|| "Arquivo".into());
-    let _ = app.emit_to(SHELL, "orla-download", DownloadProgress { id, name, received, total, state: status });
+    let progress = Progress { id, name, received, total, state: status.into() };
+    if let Err(error) = with_downloads(app, |store| store.record(&progress, path).map_err(|error| error.to_string())) {
+        let _ = app.emit_to(SHELL, "orla-download-error", format!("Não foi possível salvar o download. {error}"));
+    }
+    let _ = app.emit_to(SHELL, "orla-download", progress);
     Ok(())
 }
 
@@ -285,7 +294,7 @@ pub async fn download_action(caller: Webview, app: AppHandle, id: u32, action: S
             "cancel" => RUNNING.with_borrow(|running| running.get(&id).cloned())
                 .ok_or("Este download já terminou.".to_string())
                 .and_then(|operation| unsafe { operation.Cancel() }.map_err(|error| error.to_string())),
-            "reveal" => COMPLETED.with_borrow(|completed| completed.get(&id).cloned())
+            "reveal" => with_downloads(&callback, |store| Ok(store.completed_path(id))).ok().flatten()
                 .filter(|path| path.is_file())
                 .ok_or("O arquivo não está mais na pasta de downloads.".to_string())
                 .and_then(|path| std::process::Command::new("explorer.exe")

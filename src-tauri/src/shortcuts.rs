@@ -40,6 +40,7 @@ pub fn attach(view: &Webview) -> CommandResult {
             let action = match (key, pressed(VK_CONTROL), pressed(VK_SHIFT)) {
                 (key, false, false) if key == u32::from(VK_F12) => "devtools",
                 (0x49, true, true) => "devtools",
+                (0x46, true, false) => "find",
                 (0x4c, true, false) => "address",
                 (0x54, true, false) => "new-tab",
                 (0x54, true, true) => "reopen-tab",

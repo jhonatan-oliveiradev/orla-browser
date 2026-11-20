@@ -3,6 +3,12 @@
 #[cfg(windows)]
 mod devtools;
 #[cfg(windows)]
+mod download_store;
+#[cfg(windows)]
+mod extensions;
+#[cfg(windows)]
+mod find;
+#[cfg(windows)]
 mod shortcuts;
 #[cfg(windows)]
 mod site_events;
@@ -114,6 +120,8 @@ async fn navigate_tab(
                 );
             }
         });
+    #[cfg(windows)]
+    let builder = extensions::site_profile(builder, &app)?;
     let view = window.add_child(builder, bounds.position, bounds.size).map_err(as_message)?;
     #[cfg(windows)]
     {
@@ -191,6 +199,9 @@ mod site_events {
     }
 
     #[tauri::command]
+    pub fn download_history() -> Vec<serde_json::Value> { Vec::new() }
+
+    #[tauri::command]
     pub fn download_action(id: u32, action: String) -> super::CommandResult {
         let _ = (id, action);
         Err("Downloads estão disponíveis no Windows.".into())
@@ -205,6 +216,27 @@ mod devtools {
     }
 }
 
+#[cfg(not(windows))]
+mod extensions {
+    #[tauri::command]
+    pub fn choose_extension_folder() -> Result<Option<String>, String> {
+        Err("Extensões estão disponíveis no Windows.".into())
+    }
+
+    #[tauri::command]
+    pub fn extension_action() -> Result<serde_json::Value, String> {
+        Err("Extensões estão disponíveis no Windows.".into())
+    }
+}
+
+#[cfg(not(windows))]
+mod find {
+    #[tauri::command]
+    pub fn find_in_page() -> super::CommandResult {
+        Err("Busca na página está disponível no Windows.".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -213,7 +245,11 @@ fn main() {
             resize_tabs,
             tab_action,
             devtools::devtools_action,
+            extensions::extension_action,
+            extensions::choose_extension_folder,
+            find::find_in_page,
             site_events::download_action,
+            site_events::download_history,
             site_events::tab_preview,
             search::search_web
         ])
