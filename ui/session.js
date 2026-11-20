@@ -21,6 +21,31 @@ export function websiteAddress(value) {
   }
 }
 
+export function workspaceName(value) {
+  return typeof value === 'string' ? Array.from(value.trim().replace(/\s+/g, ' ')).slice(0, 40).join('').trimEnd() : '';
+}
+
+function searchQuery(value) {
+  return typeof value === 'string' ? Array.from(value.trim()).slice(0, 300).join('') : '';
+}
+
+function readTabGroup(value) {
+  const tabs = Array.isArray(value?.tabs) && value.tabs.length
+    ? Array.from(value.tabs, websiteAddress)
+    : [''];
+  const activeIndex = Number.isInteger(value?.activeIndex)
+    && value.activeIndex >= 0 && value.activeIndex < tabs.length
+    ? value.activeIndex : 0;
+  const pinnedIndices = new Set(Array.isArray(value?.pinnedIndices)
+    ? value.pinnedIndices.filter((index) => Number.isInteger(index) && tabs[index])
+    : []);
+
+  const queries = Array.isArray(value?.queries)
+    ? tabs.map((url, index) => url ? '' : searchQuery(value.queries[index]))
+    : tabs.map(() => '');
+  return { tabs, queries, activeIndex, pinnedIndices };
+}
+
 export function readSession(serialized) {
   let saved;
   try {
@@ -29,15 +54,21 @@ export function readSession(serialized) {
     // An unreadable snapshot starts a fresh session.
   }
 
-  const tabs = Array.isArray(saved?.tabs) && saved.tabs.length
-    ? Array.from(saved.tabs, websiteAddress)
-    : [''];
-  const activeIndex = Number.isInteger(saved?.activeIndex)
-    && saved.activeIndex >= 0 && saved.activeIndex < tabs.length
-    ? saved.activeIndex : 0;
-  const pinnedIndices = new Set(Array.isArray(saved?.pinnedIndices)
-    ? saved.pinnedIndices.filter((index) => Number.isInteger(index) && tabs[index])
-    : []);
+  const workspaces = [];
+  const ids = new Set();
+  if (Array.isArray(saved?.workspaces)) {
+    for (const entry of saved.workspaces) {
+      const id = entry?.id;
+      if (!Number.isSafeInteger(id) || id < 0 || ids.has(id)) continue;
+      ids.add(id);
+      workspaces.push({
+        id, name: workspaceName(entry.name) || 'Espaço de trabalho',
+        ...readTabGroup(entry),
+      });
+    }
+  }
+  if (!workspaces.length) workspaces.push({ id: 0, name: 'Principal', ...readTabGroup(saved) });
+  const activeWorkspaceId = ids.has(saved?.activeWorkspaceId) ? saved.activeWorkspaceId : workspaces[0].id;
 
   const favorites = new Map();
   for (const item of Array.isArray(saved?.favorites) ? saved.favorites : initialFavorites) {
@@ -52,5 +83,5 @@ export function readSession(serialized) {
   };
   const appearance = readAppearance(saved?.appearance);
   const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
-  return { tabs, activeIndex, favorites, pinnedIndices, sidebar, appearance, searchProvider };
+  return { workspaces, activeWorkspaceId, favorites, sidebar, appearance, searchProvider };
 }

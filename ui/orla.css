@@ -83,6 +83,19 @@ kbd { font: inherit; font-size: 12px; white-space: nowrap; }
 /* Sidebar and hosted pages are siblings so a site cannot cover tab controls. */
 .browser-workspace { height: calc(100dvh - var(--toolbar-height) - var(--resize-edge)); display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); margin-inline: var(--resize-edge); }
 .tab-sidebar { width: min(var(--sidebar-width, 240px), max(184px, 35vw)); position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 12px 12px 10px; background: var(--toolbar); border-right: 1px solid var(--line); }
+#workspace-toggle {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 5px 8px;
+  background: var(--graphite); text-align: left;
+}
+#workspace-toggle:hover { background: var(--hover); }
+#workspace-initial {
+  display: grid; place-items: center; flex: 0 0 21px; height: 21px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--accent); font-size: 12px; font-weight: 700;
+}
+#workspace-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.workspace-indicator { color: var(--muted); }
+.tab-sidebar[data-collapsed="true"] #workspace-toggle { justify-content: center; padding-inline: 0; }
+.tab-sidebar[data-collapsed="true"] :is(#workspace-name, .workspace-indicator) { display: none; }
 .sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 6px; }
 .sidebar-heading h2 { font-size: 13px; }
 .tab-sidebar button { min-height: 32px; border-radius: 6px; }
@@ -173,6 +186,27 @@ dialog { color: var(--text); background: var(--toolbar); border: 1px solid var(-
 dialog::backdrop { background: rgb(20 19 16 / 60%); }
 dialog button { border-radius: 6px; padding: 9px 11px; }
 dialog p { color: var(--muted); }
+#workspaces-dialog { width: 420px; }
+.workspaces-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.workspaces-heading button { font-size: 19px; line-height: 1; }
+#workspaces-list { list-style: none; margin: 10px 0 12px; padding: 2px; max-height: min(220px, 32dvh); overflow: auto; }
+#workspaces-list button {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  width: 100%; text-align: left;
+}
+#workspaces-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#workspaces-list small { color: var(--muted); }
+#workspaces-list [aria-current] { background: var(--graphite); box-shadow: inset 2px 0 var(--accent); }
+.workspace-form { border-top: 1px solid var(--line); padding-block: 10px; }
+.workspace-form label { display: block; margin-bottom: 6px; color: var(--muted); }
+.workspace-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.workspace-fields :is(input, select) {
+  min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--graphite); color: var(--text); font: inherit;
+}
+.workspace-fields button { background: var(--graphite); color: var(--accent); }
+.workspace-fields button:hover { background: var(--hover); }
+#workspace-remove-hint { font-size: 12px; margin: 3px 0 0; }
 #appearance-dialog { width: 355px; }
 #appearance-dialog h2 { margin-bottom: 16px; }
 .theme-options { margin: 0; padding: 5px 0 0; border: 0; }
