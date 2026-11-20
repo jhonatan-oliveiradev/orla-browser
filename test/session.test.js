@@ -5,8 +5,8 @@ import { readSession, websiteAddress } from '../ui/session.js';
 test('starts with one blank tab and the original favorites when storage is unavailable', () => {
   for (const value of [null, '{', '{}', '{"tabs":[]}']) {
     const session = readSession(value);
-    assert.deepEqual(session.tabs, ['']);
-    assert.equal(session.activeIndex, 0);
+    assert.deepEqual(session.workspaces[0].tabs, ['']);
+    assert.equal(session.workspaces[0].activeIndex, 0);
     assert.deepEqual(Array.from(session.favorites.values()), ['GitHub', 'MDN Web Docs', 'Figma']);
   }
 });
@@ -17,8 +17,8 @@ test('restores the order and selected tab, including an empty tab and an empty f
     activeIndex: 2,
     favorites: [],
   }));
-  assert.deepEqual(session.tabs, ['https://example.org/work', '', 'http://localhost:3000/']);
-  assert.equal(session.activeIndex, 2);
+  assert.deepEqual(session.workspaces[0].tabs, ['https://example.org/work', '', 'http://localhost:3000/']);
+  assert.equal(session.workspaces[0].activeIndex, 2);
   assert.equal(session.favorites.size, 0);
 });
 
@@ -34,8 +34,8 @@ test('repairs invalid tab positions and deduplicates valid favorites', () => {
       { url: 'file:///C:/temp', title: 'Local' },
     ],
   }));
-  assert.deepEqual(session.tabs, ['', 'https://example.org/']);
-  assert.equal(session.activeIndex, 0);
+  assert.deepEqual(session.workspaces[0].tabs, ['', 'https://example.org/']);
+  assert.equal(session.workspaces[0].activeIndex, 0);
   assert.deepEqual(Array.from(session.favorites), [
     ['https://example.org/', 'example.org'],
     ['https://example.net/#a', 'Referência'],
@@ -57,13 +57,13 @@ test('restorable addresses exclude local app origins, credentials and unsupporte
 
 test('restores pins for valid pages and leaves older sessions unpinned', () => {
   const tabs = ['https://example.org/', '', 'https://example.com/'];
-  assert.equal(readSession(JSON.stringify({ tabs })).pinnedIndices.size, 0);
+  assert.equal(readSession(JSON.stringify({ tabs })).workspaces[0].pinnedIndices.size, 0);
   const session = readSession(JSON.stringify({
     tabs, activeIndex: 2, pinnedIndices: [2, 0, 2, 1, -1, 3, '0', null],
   }));
-  assert.deepEqual([...session.pinnedIndices], [2, 0]);
-  assert.deepEqual(session.tabs, tabs);
-  assert.equal(session.activeIndex, 2);
+  assert.deepEqual([...session.workspaces[0].pinnedIndices], [2, 0]);
+  assert.deepEqual(session.workspaces[0].tabs, tabs);
+  assert.equal(session.workspaces[0].activeIndex, 2);
 });
 
 test('restores sidebar width and collapse state without breaking existing sessions', () => {
@@ -80,4 +80,38 @@ test('restores a supported theme and the background animation preference', () =>
     { theme: 'lavanda', motion: false });
   assert.deepEqual(readSession('{"appearance":{"theme":"inexistente","motion":"false"}}').appearance,
     { theme: 'lima', motion: true });
+});
+
+
+test('migrates the previous flat session to Principal with its selected tab and pins', () => {
+  const tabs = ['https://example.org/', 'https://example.net/', ''];
+  const session = readSession(JSON.stringify({ tabs, activeIndex: 1, pinnedIndices: [0] }));
+  assert.equal(session.activeWorkspaceId, 0);
+  assert.deepEqual(session.workspaces, [{
+    id: 0, name: 'Principal', tabs, activeIndex: 1, pinnedIndices: new Set([0]), queries: ['', '', ''],
+  }]);
+});
+
+test('restores workspace tabs, searches and pins independently', () => {
+  const workspaces = [
+    { id: 4, name: '  Pessoal  ', tabs: ['https://example.org/', ''], queries: ['ignored', 'orla'], activeIndex: 1, pinnedIndices: [0] },
+    { id: 7, name: 'Trabalho', tabs: ['https://example.net/', ''], queries: [null, ''], activeIndex: 0, pinnedIndices: [] },
+  ];
+  const session = readSession(JSON.stringify({ workspaces, activeWorkspaceId: 7 }));
+  assert.equal(session.activeWorkspaceId, 7);
+  assert.deepEqual(session.workspaces, [
+    { ...workspaces[0], name: 'Pessoal', queries: ['', 'orla'], pinnedIndices: new Set([0]) },
+    { ...workspaces[1], queries: ['', ''], pinnedIndices: new Set() },
+  ]);
+});
+
+test('repairs invalid or duplicate workspace records without losing earlier valid ones', () => {
+  const session = readSession(JSON.stringify({
+    activeWorkspaceId: -2,
+    workspaces: [null, { id: -2 }, { id: 2, name: '  ', tabs: [] }, { id: 2, name: 'Ignorado' }],
+  }));
+  assert.equal(session.activeWorkspaceId, 2);
+  assert.deepEqual(session.workspaces, [{
+    id: 2, name: 'Espaço de trabalho', tabs: [''], activeIndex: 0, pinnedIndices: new Set(), queries: [''],
+  }]);
 });

@@ -148,6 +148,7 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
     };
     let end = {
         let app = app.clone();
+        let id = id.clone();
         NavigationCompletedEventHandler::create(Box::new(move |sender, args| {
             let Some(args) = args else { return Ok(()) };
             let (expected, url) = latest.borrow().clone();
@@ -190,7 +191,7 @@ fn register(core: &ICoreWebView2, app: AppHandle, id: String) -> windows_core::R
             unsafe { args.Uri(&mut raw)? };
             let url = take_pwstr(raw);
             if tauri::Url::parse(&url).is_ok_and(|url| website(&url)) {
-                let _ = app.emit_to(SHELL, "orla-new-tab", url);
+                let _ = app.emit_to(SHELL, "orla-new-tab", serde_json::json!({ "id": id, "url": url }));
             }
             Ok(())
         }))

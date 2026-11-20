@@ -8,6 +8,7 @@ import { initWebSearch, providerAddress } from './web-search.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
 import { readSession, SESSION_KEY, websiteAddress } from './session.js';
+import { initWorkspaces } from './workspaces.js';
 
 const tauri = window.__TAURI__;
 const byId = (id) => document.getElementById(id);
@@ -29,7 +30,6 @@ const tabFilter = byId('tab-filter');
 const tabList = byId('tab-list');
 const reopenButton = byId('reopen-tab');
 const favoriteButton = byId('favorite-page');
-const recentlyClosed = [];
 
 let snapshot = null;
 let history = [];
@@ -44,15 +44,22 @@ try {
 const session = readSession(snapshot);
 const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
-const tabs = new Map(session.tabs.map((url, id) => [id, {
-  url, loaded: false, pinned: session.pinnedIndices.has(id), title: knownTitles.get(url) || '',
-}]));
-let activeId = session.activeIndex;
+const tabs = new Map();
+const workspaces = new Map();
+let nextId = 0;
+for (const { id, name, tabs: urls, queries, pinnedIndices, activeIndex } of session.workspaces) {
+  workspaces.set(id, { id, name, activeId: nextId + activeIndex, recentlyClosed: [] });
+  for (const [index, url] of urls.entries()) {
+    const tab = { workspaceId: id, url, loaded: false, pinned: pinnedIndices.has(index), title: knownTitles.get(url) || '' };
+    if (queries[index]) tab.webSearch = searchState(queries[index], 'Pesquise novamente para atualizar os resultados.');
+    tabs.set(nextId++, tab);
+  }
+}
+let activeWorkspace = workspaces.get(session.activeWorkspaceId);
 let sidebarSettings = session.sidebar;
 let appearance = session.appearance;
 let searchProvider = session.searchProvider;
 let addressDirty = false;
-let nextId = tabs.size;
 let pending = Promise.resolve();
 let storageFailed = false;
 
@@ -74,11 +81,21 @@ async function invoke(command, args = {}) {
 function saveSession() {
   if (!tauri) return;
   try {
-    const entries = Array.from(tabs.entries());
+    const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
+    for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      tabs: entries.map(([, tab]) => tab.url),
-      activeIndex: entries.findIndex(([id]) => id === activeId),
-      pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
+      workspaces: [...workspaces.values()].map(({ id, name, activeId }) => {
+        const entries = groups.get(id);
+        return {
+          id,
+          name,
+          tabs: entries.map(([, tab]) => tab.url),
+          queries: entries.map(([, tab]) => tab.webSearch?.query || ''),
+          activeIndex: entries.findIndex(([tabId]) => tabId === activeId),
+          pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
+        };
+      }),
+      activeWorkspaceId: activeWorkspace.id,
       favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
       sidebar: sidebarSettings,
       appearance,
@@ -95,7 +112,8 @@ const showOffline = initOffline();
 const downloads = initDownloads(invoke);
 
 function render() {
-  const tab = tabs.get(activeId);
+  const tab = tabs.get(activeWorkspace.activeId);
+  workspaceControls.renderCurrent(activeWorkspace.name);
   updateWindowTitle();
   if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
   home.hidden = tab.loaded || Boolean(tab.webSearch);
@@ -142,8 +160,12 @@ function resumeRow(url, activate, title = '', date = null) {
   return row;
 }
 
+function workspaceTabs(workspace = activeWorkspace) {
+  return [...tabs].filter(([, tab]) => tab.workspaceId === workspace.id);
+}
+
 function orderedTabs() {
-  return [...tabs].sort(([, first], [, second]) => Number(second.pinned) - Number(first.pinned));
+  return workspaceTabs().sort(([, first], [, second]) => Number(second.pinned) - Number(first.pinned));
 }
 
 function renderResume() {
@@ -152,11 +174,11 @@ function renderResume() {
   open.replaceChildren();
   closed.replaceChildren();
   for (const [id, tab] of orderedTabs()) {
-    if (!tab.url || id === activeId) continue;
+    if (!tab.url || id === activeWorkspace.activeId) continue;
     open.append(resumeRow(tab.url, () => selectTab(id), tab.title));
   }
-  for (let index = recentlyClosed.length - 1; index >= 0; index--) {
-    const entry = recentlyClosed[index];
+  for (let index = activeWorkspace.recentlyClosed.length - 1; index >= 0; index--) {
+    const entry = activeWorkspace.recentlyClosed[index];
     closed.append(resumeRow(entry.url, () => reopenTab(entry), entry.title));
   }
   byId('resume-open-empty').hidden = open.childElementCount > 0;
@@ -221,7 +243,7 @@ const resetHome = initHome(renderResume);
 function showCurrentAddress() {
   addressDirty = false;
   address.setCustomValidity('');
-  const tab = tabs.get(activeId);
+  const tab = tabs.get(activeWorkspace.activeId);
   address.value = tab.url || tab.webSearch?.query || '';
 }
 
@@ -232,9 +254,9 @@ function stagePosition() {
 
 async function selectTab(id) {
   omnibox.close();
-  if (!tabs.has(id)) return;
-  if (id !== activeId) {
-    activeId = id;
+  if (tabs.get(id)?.workspaceId !== activeWorkspace.id) return;
+  if (id !== activeWorkspace.activeId) {
+    activeWorkspace.activeId = id;
     showCurrentAddress();
     saveSession();
   }
@@ -243,22 +265,14 @@ async function selectTab(id) {
 
 async function closeTab(id) {
   const tab = tabs.get(id);
-  if (!tab) return;
+  if (tab?.workspaceId !== activeWorkspace.id) return;
   if (tab.loaded) await invoke('tab_action', { id, action: 'close' });
 
   if (tab.url) {
-    recentlyClosed.push({ url: tab.url, pinned: tab.pinned, title: tab.title });
-    if (recentlyClosed.length > 20) recentlyClosed.shift();
+    activeWorkspace.recentlyClosed.push({ url: tab.url, pinned: tab.pinned, title: tab.title });
+    if (activeWorkspace.recentlyClosed.length > 20) activeWorkspace.recentlyClosed.shift();
   }
-  const previousActive = activeId;
-  const ids = orderedTabs().map(([id]) => id);
-  const index = ids.indexOf(id);
-  tabs.delete(id);
-  if (!tabs.size) createTab();
-  else if (id === activeId) activeId = ids[index + 1] ?? ids[index - 1];
-  if (activeId !== previousActive) {
-    showCurrentAddress();
-  }
+  detachActiveWorkspaceTab(id);
   saveSession();
   await syncView();
 }
@@ -309,7 +323,7 @@ function queueTabPreview(button) {
 }
 
 function updateWindowTitle() {
-  const title = tabs.get(activeId)?.title;
+  const title = tabs.get(activeWorkspace.activeId)?.title;
   const fullTitle = title ? title + ' · Orla Browser' : 'Orla Browser';
   if (document.title === fullTitle) return;
   document.title = fullTitle;
@@ -322,12 +336,12 @@ function updateTabTitle(id, url, title) {
   tab.pendingTitle = { url, title };
   if (tab.url !== url || tab.title === title) return;
   tab.title = title;
-  if (id === activeId) updateWindowTitle();
+  if (id === activeWorkspace.activeId) updateWindowTitle();
   if (tab.visit?.url === url && history.includes(tab.visit)) {
     tab.visit.title = title;
     saveHistory();
   }
-  refreshTabList();
+  if (tab.workspaceId === activeWorkspace.id) refreshTabList();
 }
 
 function resetTabPreview(tab) {
@@ -343,10 +357,10 @@ function refreshTabList() {
   const scroll = tabList.scrollTop;
   closeTabPreview();
   tabList.replaceChildren();
-  reopenButton.disabled = !recentlyClosed.length;
+  reopenButton.disabled = !activeWorkspace.recentlyClosed.length;
   const filter = sidebarSettings.collapsed ? '' : (tabFilter.value || '').trim().toLocaleLowerCase('pt-BR');
   for (const [id, tab] of orderedTabs()) {
-    if (sidebarSettings.collapsed && id !== activeId) continue;
+    if (sidebarSettings.collapsed && id !== activeWorkspace.activeId) continue;
     const title = tab.url ? tab.title || new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba';
     if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter)
       && !tab.url.toLowerCase().includes(filter)) continue;
@@ -359,7 +373,7 @@ function refreshTabList() {
     if (!tab.url) select.title = title;
     select.setAttribute('aria-label', title);
     select.dataset.focusKey = 'select-' + id;
-    if (id === activeId) select.setAttribute('aria-current', 'true');
+    if (id === activeWorkspace.activeId) select.setAttribute('aria-current', 'true');
     select.addEventListener('click', () => {
       closeTabPreview();
       schedule(() => selectTab(id));
@@ -394,7 +408,7 @@ function refreshTabList() {
       pin.dataset.focusKey = 'pin-' + id;
       pin.setAttribute('aria-label', label + ' aba ' + title);
       pin.addEventListener('click', () => schedule(() => {
-        if (!tabs.has(id)) return;
+        if (tabs.get(id)?.workspaceId !== activeWorkspace.id) return;
         tab.pinned = !tab.pinned;
         saveSession();
         refreshTabList();
@@ -414,9 +428,24 @@ function refreshTabList() {
   }
 }
 
-function createTab(url = '', pinned = false) {
-  activeId = nextId++;
-  tabs.set(activeId, { url, loaded: false, pinned, title: '' });
+function createTab(url = '', pinned = false, workspace = activeWorkspace) {
+  const id = nextId++;
+  tabs.set(id, { workspaceId: workspace.id, url, loaded: false, pinned, title: knownTitles.get(url) || '' });
+  if (workspace === activeWorkspace) workspace.activeId = id;
+}
+
+function detachActiveWorkspaceTab(id) {
+  const ids = orderedTabs().map(([tabId]) => tabId);
+  const index = ids.indexOf(id);
+  tabs.delete(id);
+  if (id !== activeWorkspace.activeId) return;
+  if (ids.length === 1) createTab();
+  else activeWorkspace.activeId = ids[index + 1] ?? ids[index - 1];
+  showCurrentAddress();
+}
+
+function searchState(query, status = '') {
+  return { query, results: [], status };
 }
 
 async function syncView(focusTabId) {
@@ -424,7 +453,7 @@ async function syncView(focusTabId) {
   refreshTabList();
   if (!home.hidden && !byId('home-resume').hidden) renderResume();
   if (!tauri) return;
-  const tab = tabs.get(activeId);
+  const tab = tabs.get(activeWorkspace.activeId);
   if (!tab.url || tab.failure || document.querySelector('dialog[open]')) {
     await invoke('show_tab', { id: null, focus: Boolean(tab.failure) });
     return;
@@ -432,7 +461,7 @@ async function syncView(focusTabId) {
   if (!tab.loaded) {
     await invoke('show_tab', { id: null });
     try {
-      await invoke('navigate_tab', { id: activeId, address: tab.url, ...stagePosition() });
+      await invoke('navigate_tab', { id: activeWorkspace.activeId, address: tab.url, ...stagePosition() });
     } catch {
       tab.failure = 'navigation';
       tab.loaded = true;
@@ -442,7 +471,7 @@ async function syncView(focusTabId) {
     tab.loaded = true;
     render();
   }
-  await invoke('show_tab', { id: activeId, focus: focusTabId === activeId, ...stagePosition() });
+  await invoke('show_tab', { id: activeWorkspace.activeId, focus: focusTabId === activeWorkspace.activeId, ...stagePosition() });
 }
 
 async function go(url) {
@@ -451,7 +480,7 @@ async function go(url) {
   const target = websiteAddress(url);
   if (!target) throw new Error('Use um endereço HTTP ou HTTPS válido, sem credenciais.');
 
-  const id = activeId;
+  const id = activeWorkspace.activeId;
   const tab = tabs.get(id);
   try {
     await invoke('navigate_tab', { id, address: target, ...stagePosition() });
@@ -487,14 +516,88 @@ async function openTab(url, pinned) {
   if (!url) resetHome();
   showCurrentAddress();
   saveSession();
-  await syncView(url ? activeId : undefined);
+  await syncView(url ? activeWorkspace.activeId : undefined);
   if (!url) address.focus();
 }
 
-function reopenTab(entry = recentlyClosed.at(-1)) {
-  const index = recentlyClosed.indexOf(entry);
+function hasContent(tab) {
+  return Boolean(tab.url || tab.webSearch);
+}
+
+function workspaceOptions() {
+  const counts = new Map();
+  for (const { workspaceId, url, webSearch } of tabs.values()) {
+    if (url || webSearch) counts.set(workspaceId, (counts.get(workspaceId) || 0) + 1);
+  }
+  return [...workspaces.values()].map(({ id, name }) => ({ id, name, count: counts.get(id) || 0 }));
+}
+
+const workspaceControls = initWorkspaces({
+  open: openDialog,
+  getState: () => ({
+    spaces: workspaceOptions(),
+    activeId: activeWorkspace.id,
+    canMove: hasContent(tabs.get(activeWorkspace.activeId)),
+    canRemove: workspaces.size > 1 && workspaceTabs().every(([, tab]) => !hasContent(tab)),
+  }),
+  select: (id) => schedule(() => {
+    const workspace = workspaces.get(id);
+    if (workspace) switchWorkspace(workspace);
+  }),
+  create: (name) => schedule(() => {
+    let id = 0;
+    while (workspaces.has(id)) id++;
+    const workspace = { id, name, activeId: undefined, recentlyClosed: [] };
+    workspaces.set(id, workspace);
+    switchWorkspace(workspace);
+  }),
+  rename: (name) => schedule(() => {
+    activeWorkspace.name = name;
+    saveSession();
+    workspaceControls.renderCurrent(name);
+    workspaceControls.renderDialog();
+  }),
+  move: (id) => schedule(() => {
+    const target = workspaces.get(id);
+    const tabId = activeWorkspace.activeId;
+    const tab = tabs.get(tabId);
+    if (!target || target === activeWorkspace || !hasContent(tab)) return;
+    detachActiveWorkspaceTab(tabId);
+    const targetEntries = workspaceTabs(target);
+    if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
+      tabs.delete(targetEntries[0][0]);
+      target.activeId = tabId;
+    }
+    tab.workspaceId = target.id;
+    tabs.set(tabId, tab);
+    saveSession();
+    workspaceControls.close();
+  }),
+  remove: () => schedule(() => {
+    const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
+    const entries = workspaceTabs();
+    if (!target || entries.some(([, tab]) => hasContent(tab))) return;
+    for (const [id] of entries) tabs.delete(id);
+    workspaces.delete(activeWorkspace.id);
+    switchWorkspace(target);
+  }),
+});
+
+function switchWorkspace(workspace) {
+  omnibox.close();
+  closeTabPreview();
+  activeWorkspace = workspace;
+  if (workspace.activeId === undefined) createTab();
+  tabFilter.value = '';
+  showCurrentAddress();
+  saveSession();
+  workspaceControls.close();
+}
+
+function reopenTab(entry = activeWorkspace.recentlyClosed.at(-1)) {
+  const index = activeWorkspace.recentlyClosed.indexOf(entry);
   if (index < 0) return;
-  recentlyClosed.splice(index, 1);
+  activeWorkspace.recentlyClosed.splice(index, 1);
   return openTab(entry.url, entry.pinned);
 }
 
@@ -505,7 +608,7 @@ for (const button of document.querySelectorAll('[data-dismiss]')) {
   button.addEventListener('click', () => button.closest('dialog').close());
 }
 byId('downloads-toggle').addEventListener('click', () => openDialog(byId('downloads-dialog')));
-byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeId).url)));
+byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeWorkspace.activeId).url)));
 byId('appearance').addEventListener('click', () => openDialog(byId('appearance-dialog')));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
@@ -514,7 +617,7 @@ for (const button of [byId('new-tab'), byId('add-tab')]) {
 reopenButton.addEventListener('click', () => schedule(reopenTab));
 tabFilter.addEventListener('input', refreshTabList);
 favoriteButton.addEventListener('click', () => {
-  const url = tabs.get(activeId).url;
+  const url = tabs.get(activeWorkspace.activeId).url;
   if (!url) return;
   if (favorites.has(url)) favorites.delete(url);
   else favorites.set(url, new URL(url).hostname);
@@ -524,7 +627,7 @@ favoriteButton.addEventListener('click', () => {
 });
 
 for (const button of document.querySelectorAll('[data-tab-action]')) {
-  button.addEventListener('click', () => schedule(() => invoke('tab_action', { id: activeId, action: button.dataset.tabAction })));
+  button.addEventListener('click', () => schedule(() => invoke('tab_action', { id: activeWorkspace.activeId, action: button.dataset.tabAction })));
 }
 if (tauri?.window) {
   const frame = tauri.window.getCurrentWindow();
@@ -546,15 +649,15 @@ if (tauri?.window) {
 }
 const webSearch = initWebSearch({
   invoke,
-  isActive: (state) => tabs.get(activeId).webSearch === state,
+  isActive: (state) => tabs.get(activeWorkspace.activeId).webSearch === state,
   openResult: (url) => schedule(() => openTab(url)),
 });
 
 async function searchWeb(query) {
   if (Array.from(query).length > 300) throw new Error('Digite uma pesquisa de até 300 caracteres.');
-  if (tabs.get(activeId).url) createTab();
-  const tab = tabs.get(activeId);
-  tab.webSearch = { query, results: [], status: '' };
+  if (tabs.get(activeWorkspace.activeId).url) createTab();
+  const tab = tabs.get(activeWorkspace.activeId);
+  tab.webSearch = searchState(query);
   showCurrentAddress();
   homeSearch.value = '';
   saveSession();
@@ -573,7 +676,7 @@ byId('web-search-form').addEventListener('submit', (event) => {
   if (query) schedule(() => searchWeb(query));
 });
 byId('search-fallback').addEventListener('click', () => {
-  const query = tabs.get(activeId).webSearch?.query;
+  const query = tabs.get(activeWorkspace.activeId).webSearch?.query;
   if (query) schedule(() => openTab(duckDuckGo(query)));
 });
 function openProviderSettings() {
@@ -612,7 +715,7 @@ byId('search-provider-form').addEventListener('submit', (event) => {
   }
   saveSession();
   providerDialog.close();
-  const state = tabs.get(activeId).webSearch;
+  const state = tabs.get(activeWorkspace.activeId).webSearch;
   if (state) webSearch.run(state, searchProvider);
 });
 providerInput.addEventListener('input', () => {
@@ -624,7 +727,7 @@ providerInput.addEventListener('input', () => {
 const omnibox = initOmnibox({
   input: address,
   list: byId('address-suggestions'),
-  search: (query) => suggestPages(query, { tabs, favorites, history, activeId }),
+  search: (query) => suggestPages(query, { tabs: workspaceTabs(), favorites, history, activeId: activeWorkspace.activeId }),
   onSelect: (result) => schedule(() => result.kind === 'tab' ? selectTab(result.id) : go(result.url)),
   onLayout: scheduleLayout,
 });
@@ -663,7 +766,7 @@ function runShortcut(action) {
       return true;
     case 'new-tab': schedule(() => openTab()); return true;
     case 'reopen-tab': schedule(() => reopenTab()); return true;
-    case 'close-tab': schedule(() => closeTab(activeId)); return true;
+    case 'close-tab': schedule(() => closeTab(activeWorkspace.activeId)); return true;
     default: return false;
   }
 }
@@ -732,13 +835,13 @@ if (tauri) {
         tab.url = url;
         tab.title = tab.pendingTitle?.url === url ? tab.pendingTitle.title : '';
         saveSession();
-        if (id === activeId) render();
-        refreshTabList();
+        if (id === activeWorkspace.activeId) render();
+        if (tab.workspaceId === activeWorkspace.id) refreshTabList();
       }
       if (payload.failure) {
         tab.failure = payload.failure;
         tab.loaded = true;
-        if (id === activeId) {
+        if (id === activeWorkspace.activeId) {
           await syncView();
           byId('offline-retry').focus();
         }
@@ -775,10 +878,15 @@ if (tauri) {
       tab.thumbnail = 'data:image/jpeg;base64,' + data;
       if (!tabPreview.hidden && Number(previewTarget?.dataset.tabId) === payload.id) renderTabPreview();
     });
-    await tauri.event.listen('orla-new-tab', ({ payload }) => {
-      const url = websiteAddress(payload);
-      if (url) schedule(() => openTab(url));
-    });
+    await tauri.event.listen('orla-new-tab', ({ payload }) => schedule(() => {
+      const url = websiteAddress(payload.url);
+      const source = tabs.get(Number(payload.id.slice(4)));
+      if (!url || !source) return;
+      const workspace = workspaces.get(source.workspaceId);
+      if (workspace === activeWorkspace) return openTab(url);
+      createTab(url, false, workspace);
+      saveSession();
+    }));
     await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
     await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));

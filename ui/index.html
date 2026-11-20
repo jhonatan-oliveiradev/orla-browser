@@ -34,6 +34,11 @@
   </header>
   <div class="browser-workspace">
     <aside id="tab-sidebar" class="tab-sidebar" aria-labelledby="tab-heading">
+      <button id="workspace-toggle" type="button" aria-haspopup="dialog" aria-controls="workspaces-dialog">
+        <span id="workspace-initial" aria-hidden="true">P</span>
+        <span id="workspace-name">Principal</span>
+        <span class="workspace-indicator" aria-hidden="true">⌄</span>
+      </button>
       <div class="sidebar-heading">
         <h2 id="tab-heading">Abas</h2>
         <button id="add-tab" class="icon" type="button" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
@@ -172,6 +177,36 @@
     <div data-resize="NorthWest"></div>
   </div>
   <p id="status" role="status" hidden></p>
+  <dialog id="workspaces-dialog" aria-labelledby="workspaces-heading">
+    <header class="workspaces-heading">
+      <h2 id="workspaces-heading">Espaços de trabalho</h2>
+      <button type="button" data-dismiss aria-label="Fechar espaços de trabalho">×</button>
+    </header>
+    <ul id="workspaces-list"></ul>
+    <form id="workspace-create-form" class="workspace-form">
+      <label for="workspace-create-name">Novo espaço</label>
+      <div class="workspace-fields">
+        <input id="workspace-create-name" placeholder="Ex. Trabalho" maxlength="40" required autocomplete="off">
+        <button type="submit">Criar</button>
+      </div>
+    </form>
+    <form id="workspace-rename-form" class="workspace-form">
+      <label for="workspace-rename-name">Nome do espaço atual</label>
+      <div class="workspace-fields">
+        <input id="workspace-rename-name" maxlength="40" required autocomplete="off">
+        <button type="submit">Renomear</button>
+      </div>
+    </form>
+    <form id="workspace-move-form" class="workspace-form" hidden>
+      <label for="workspace-move-target">Mover a aba atual para</label>
+      <div class="workspace-fields">
+        <select id="workspace-move-target"></select>
+        <button type="submit">Mover</button>
+      </div>
+    </form>
+    <button id="workspace-remove" type="button" aria-describedby="workspace-remove-hint">Excluir espaço atual</button>
+    <p id="workspace-remove-hint" hidden>Feche ou mova as abas para excluir este espaço.</p>
+  </dialog>
   <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
     <h2 id="downloads-heading">Downloads</h2>
     <p id="downloads-empty">Os arquivos baixados nesta sessão aparecem aqui.</p>
