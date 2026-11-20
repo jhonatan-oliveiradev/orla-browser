@@ -3,6 +3,9 @@ name = "orla-browser"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+windows-smoke = []
+
 [build-dependencies]
 tauri-build = "2"
 
