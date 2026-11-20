@@ -25,6 +25,7 @@
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
       <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
       <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog" aria-controls="downloads-dialog" data-static-icon="download"></button>
+      <button id="devtools-toggle" class="icon" type="button" aria-label="DevTools" title="DevTools (F12)" aria-expanded="false" aria-controls="devtools-panel" aria-keyshortcuts="F12 Control+Shift+I" data-static-icon="devtools"></button>
       <button id="agent" class="icon" type="button" aria-label="Agente" title="Agente" aria-haspopup="dialog" aria-controls="agent-dialog" data-static-icon="agent"></button>
     </div>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
@@ -86,7 +87,12 @@
               <button type="submit" aria-label="Pesquisar" title="Pesquisar" data-static-icon="forward"></button>
             </form>
             <nav class="favorites" aria-label="Favoritos">
-              <p>Favoritos</p>
+              <div class="collection-heading">
+                <p>Favoritos</p>
+                <button id="bookmarks-import" type="button">Importar HTML</button>
+              </div>
+              <input id="bookmarks-file" type="file" accept=".html,.htm,text/html" hidden>
+              <p id="bookmarks-status" class="collection-status" role="status"></p>
               <div id="favorites-list"></div>
               <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
             </nav>
@@ -100,14 +106,28 @@
                 <p id="widget-date"></p>
               </section>
               <section class="home-card notes-card" aria-labelledby="notes-title">
-                <h2 id="notes-title"><label for="widget-notes">Bloco de notas</label></h2>
-                <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-status"></textarea>
+                <h2 id="notes-title"><label for="widget-notes">Notas do espaço</label></h2>
+                <p id="notes-workspace"></p>
+                <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-workspace notes-status"></textarea>
                 <p id="notes-status" role="status">Salvo neste dispositivo</p>
               </section>
             </div>
           </section>
           <section class="home-workspace" id="home-resume" role="tabpanel" aria-labelledby="home-resume-tab" tabindex="0" hidden>
             <h1>Retomar</h1>
+            <section class="home-card project-card" aria-labelledby="projects-title">
+              <div class="collection-heading">
+                <h2 id="projects-title">Sessões salvas</h2>
+                <div class="project-actions">
+                  <button id="project-import" type="button">Importar sessão</button>
+                  <button id="project-save" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
+                </div>
+              </div>
+              <input id="project-import-file" type="file" accept=".json,application/json" hidden>
+              <p id="projects-empty">Salve as abas e notas do espaço atual para reabrir em um novo espaço.</p>
+              <p id="project-status" class="collection-status" role="status"></p>
+              <ul id="projects-list"></ul>
+            </section>
             <div class="widget-grid">
               <section class="home-card" aria-labelledby="open-tabs-title">
                 <h2 id="open-tabs-title">Abas abertas</h2>
@@ -169,6 +189,63 @@
           <ol id="web-search-results" class="web-search-results"></ol>
         </section>
       </div>
+      <section id="devtools-panel" class="devtools" aria-labelledby="devtools-heading" hidden>
+        <div id="devtools-divider" class="devtools-divider" role="separator" tabindex="0" aria-label="Altura do painel DevTools"
+          aria-controls="devtools-panel" aria-orientation="horizontal" aria-valuemin="150" aria-valuemax="410" aria-valuenow="260"></div>
+        <header class="devtools-header">
+          <h2 id="devtools-heading">DevTools</h2>
+          <small id="devtools-site"></small>
+          <div class="devtools-tabs" role="tablist" aria-label="Painéis do DevTools">
+            <button id="devtools-tab-elements" type="button" role="tab" aria-selected="true" aria-controls="devtools-elements" data-devtools-section="elements">Elementos</button>
+            <button id="devtools-tab-console" type="button" role="tab" aria-selected="false" aria-controls="devtools-console" tabindex="-1" data-devtools-section="console">Console</button>
+            <button id="devtools-tab-network" type="button" role="tab" aria-selected="false" aria-controls="devtools-network" tabindex="-1" data-devtools-section="network">Rede</button>
+          </div>
+          <button id="devtools-close" class="icon" type="button" title="Fechar DevTools" aria-label="Fechar DevTools" data-static-icon="close"></button>
+        </header>
+        <p id="devtools-status" role="status"></p>
+        <section id="devtools-elements" class="devtools-elements" role="tabpanel" aria-labelledby="devtools-tab-elements">
+          <div class="devtools-column">
+            <div class="devtools-actions">
+              <button id="devtools-refresh" type="button" data-requires-devtools disabled>Atualizar DOM</button>
+            </div>
+            <ul id="devtools-tree" class="devtools-tree" aria-label="Elementos da página"></ul>
+          </div>
+          <div class="devtools-column">
+            <div class="devtools-actions">
+              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos computados" placeholder="Filtrar estilos computados">
+            </div>
+            <p id="devtools-style-empty">Selecione um elemento para ver seus estilos.</p>
+            <dl id="devtools-styles"></dl>
+          </div>
+        </section>
+        <section id="devtools-console" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-console" hidden>
+          <div class="devtools-actions">
+            <button id="devtools-clear-console" type="button">Limpar console</button>
+          </div>
+          <div class="devtools-scroll">
+            <p id="devtools-console-empty">As mensagens da página aparecem aqui.</p>
+            <ul id="devtools-console-list" aria-label="Mensagens do console"></ul>
+          </div>
+          <form id="devtools-console-form" class="devtools-actions">
+            <input id="devtools-expression" type="text" autocomplete="off" spellcheck="false" maxlength="4096"
+              aria-label="Expressão JavaScript" placeholder="Expressão JavaScript na aba ativa" data-requires-devtools disabled>
+            <button type="submit" data-requires-devtools disabled>Executar</button>
+          </form>
+        </section>
+        <section id="devtools-network" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-network" hidden>
+          <div class="devtools-actions">
+            <input id="devtools-network-filter" type="search" aria-label="Filtrar requisições" placeholder="Filtrar requisições">
+            <button id="devtools-clear-network" type="button">Limpar rede</button>
+          </div>
+          <div class="devtools-scroll">
+            <p id="devtools-network-empty">Recarregue a página para capturar as requisições.</p>
+            <table aria-label="Requisições de rede">
+              <thead><tr><th>Método</th><th>Status</th><th>Tipo</th><th>URL</th></tr></thead>
+              <tbody id="devtools-requests"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
     </div>
   </div>
   <div class="window-resize" aria-hidden="true">
@@ -209,8 +286,22 @@
         <button type="submit">Mover</button>
       </div>
     </form>
+    <button id="workspace-save-project" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
     <button id="workspace-remove" type="button" aria-describedby="workspace-remove-hint">Excluir espaço atual</button>
-    <p id="workspace-remove-hint" hidden>Feche ou mova as abas para excluir este espaço.</p>
+    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem abas abertas e sem notas.</p>
+  </dialog>
+  <dialog id="project-save-dialog" aria-labelledby="project-save-title">
+    <h2 id="project-save-title">Salvar sessão</h2>
+    <p>Guarda uma cópia das abas, dos fixados e das notas do espaço atual.</p>
+    <form id="project-save-form" class="workspace-form">
+      <label for="project-name">Nome da sessão</label>
+      <div class="workspace-fields">
+        <input id="project-name" maxlength="40" required autofocus autocomplete="off">
+        <button type="submit">Salvar</button>
+      </div>
+      <p id="project-save-status" class="collection-status" role="status"></p>
+    </form>
+    <button type="button" data-dismiss>Cancelar</button>
   </dialog>
   <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
     <h2 id="downloads-heading">Downloads</h2>

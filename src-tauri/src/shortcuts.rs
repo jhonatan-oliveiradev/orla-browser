@@ -7,7 +7,7 @@ use webview2_com::{
     },
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    GetKeyState, VK_CONTROL, VK_F12, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 
 use crate::{as_message, CommandResult, SHELL};
@@ -32,17 +32,18 @@ pub fn attach(view: &Webview) -> CommandResult {
                 args.VirtualKey(&mut key)?;
                 args.PhysicalKeyStatus(&mut status)?;
             }
-            if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN || !pressed(VK_CONTROL)
-                || pressed(VK_MENU) || pressed(VK_LWIN) || pressed(VK_RWIN)
+            if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN || pressed(VK_MENU) || pressed(VK_LWIN) || pressed(VK_RWIN)
             {
                 return Ok(());
             }
 
-            let action = match (key, pressed(VK_SHIFT)) {
-                (0x4c, false) => "address",
-                (0x54, false) => "new-tab",
-                (0x54, true) => "reopen-tab",
-                (0x57, false) => "close-tab",
+            let action = match (key, pressed(VK_CONTROL), pressed(VK_SHIFT)) {
+                (key, false, false) if key == u32::from(VK_F12) => "devtools",
+                (0x49, true, true) => "devtools",
+                (0x4c, true, false) => "address",
+                (0x54, true, false) => "new-tab",
+                (0x54, true, true) => "reopen-tab",
+                (0x57, true, false) => "close-tab",
                 _ => return Ok(()),
             };
             unsafe { args.SetHandled(true)? };

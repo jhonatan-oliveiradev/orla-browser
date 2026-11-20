@@ -2,6 +2,7 @@ import { readAppearance } from './appearance.js';
 import { sidebarWidth } from './sidebar.js';
 
 export const SESSION_KEY = 'orla.session.v1';
+export const LEGACY_NOTE_KEY = 'orla.home.note.v1';
 
 const initialFavorites = [
   { url: 'https://github.com/', title: 'GitHub' },
@@ -46,7 +47,19 @@ function readTabGroup(value) {
   return { tabs, queries, activeIndex, pinnedIndices };
 }
 
-export function readSession(serialized) {
+export function workspaceNotes(value) {
+  return typeof value === 'string' ? value.slice(0, 4000) : '';
+}
+
+export function readSavedProject(value) {
+  const name = workspaceName(value?.name);
+  if (!name || !Number.isSafeInteger(value.savedAt) || value.savedAt < 1 || value.savedAt > 8_640_000_000_000_000) return null;
+  const group = readTabGroup(value);
+  if (!group.tabs.some(Boolean) && !group.queries.some(Boolean) && !workspaceNotes(value.notes).trim()) return null;
+  return { name, savedAt: value.savedAt, notes: workspaceNotes(value.notes), ...group, pinnedIndices: [...group.pinnedIndices] };
+}
+
+export function readSession(serialized, legacyNote) {
   let saved;
   try {
     saved = JSON.parse(serialized);
@@ -55,12 +68,14 @@ export function readSession(serialized) {
   }
 
   const workspaces = [];
+  const entriesById = new Map();
   const ids = new Set();
   if (Array.isArray(saved?.workspaces)) {
     for (const entry of saved.workspaces) {
       const id = entry?.id;
       if (!Number.isSafeInteger(id) || id < 0 || ids.has(id)) continue;
       ids.add(id);
+      entriesById.set(id, entry);
       workspaces.push({
         id, name: workspaceName(entry.name) || 'Espaço de trabalho',
         ...readTabGroup(entry),
@@ -68,6 +83,12 @@ export function readSession(serialized) {
     }
   }
   if (!workspaces.length) workspaces.push({ id: 0, name: 'Principal', ...readTabGroup(saved) });
+  const originalWorkspace = workspaces.find(({ id }) => id === 0) ?? workspaces[0];
+  const notes = new Map(workspaces.map(({ id }) => {
+    const stored = entriesById.get(id)?.notes;
+    return [id, workspaceNotes(stored ?? (id === originalWorkspace.id ? legacyNote : ''))];
+  }));
+  const projects = Array.isArray(saved?.projects) ? saved.projects.map(readSavedProject).filter(Boolean) : [];
   const activeWorkspaceId = ids.has(saved?.activeWorkspaceId) ? saved.activeWorkspaceId : workspaces[0].id;
 
   const favorites = new Map();
@@ -83,5 +104,5 @@ export function readSession(serialized) {
   };
   const appearance = readAppearance(saved?.appearance);
   const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
-  return { workspaces, activeWorkspaceId, favorites, sidebar, appearance, searchProvider };
+  return { workspaces, activeWorkspaceId, notes, projects, favorites, sidebar, appearance, searchProvider };
 }

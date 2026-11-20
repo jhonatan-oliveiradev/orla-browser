@@ -1,4 +1,7 @@
 import { duckDuckGo, resolveNavigation } from './address.js';
+import { readBookmarkFile } from './bookmarks.js';
+import { initProjects } from './projects.js';
+import { initDevTools } from './devtools.js';
 import { initDownloads } from './downloads.js';
 import { initOffline } from './offline.js';
 import { releaseIcon, setIcon } from './icons.js';
@@ -8,7 +11,7 @@ import { initOmnibox } from './omnibox.js';
 import { initWebSearch, providerAddress } from './web-search.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
-import { readSession, SESSION_KEY, websiteAddress } from './session.js';
+import { LEGACY_NOTE_KEY, readSavedProject, readSession, SESSION_KEY, websiteAddress, workspaceNotes } from './session.js';
 import { initWorkspaces } from './workspaces.js';
 
 const tauri = window.__TAURI__;
@@ -31,30 +34,30 @@ const tabFilter = byId('tab-filter');
 const tabList = byId('tab-list');
 const reopenButton = byId('reopen-tab');
 const favoriteButton = byId('favorite-page');
+const notesInput = byId('widget-notes');
+const notesStatus = byId('notes-status');
 
 let snapshot = null;
 let history = [];
+let legacyNote;
 try {
   if (tauri) {
     snapshot = localStorage.getItem(SESSION_KEY);
+    legacyNote = localStorage.getItem(LEGACY_NOTE_KEY);
     history = readHistory(localStorage.getItem(HISTORY_KEY));
   }
 } catch {
   // Navigation remains available if the WebView storage cannot be read.
 }
-const session = readSession(snapshot);
+const session = readSession(snapshot, legacyNote);
+const projects = session.projects;
 const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
 const tabs = new Map();
 const workspaces = new Map();
 let nextId = 0;
-for (const { id, name, tabs: urls, queries, pinnedIndices, activeIndex } of session.workspaces) {
-  workspaces.set(id, { id, name, activeId: nextId + activeIndex, recentlyClosed: [] });
-  for (const [index, url] of urls.entries()) {
-    const tab = { workspaceId: id, url, loaded: false, pinned: pinnedIndices.has(index), title: knownTitles.get(url) || '' };
-    if (queries[index]) tab.webSearch = searchState(queries[index], 'Pesquise novamente para atualizar os resultados.');
-    tabs.set(nextId++, tab);
-  }
+for (const group of session.workspaces) {
+  mountWorkspace({ ...group, notes: session.notes.get(group.id) });
 }
 let activeWorkspace = workspaces.get(session.activeWorkspaceId);
 let sidebarSettings = session.sidebar;
@@ -79,23 +82,43 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
+function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0 }) {
+  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed: [] };
+  workspaces.set(id, workspace);
+  const pinned = new Set(pinnedIndices);
+  for (const [index, url] of urls.entries()) {
+    const tab = { workspaceId: id, url, loaded: false, pinned: pinned.has(index), title: knownTitles.get(url) || '' };
+    if (queries[index]) tab.webSearch = searchState(queries[index], 'Pesquise novamente para atualizar os resultados.');
+    tabs.set(nextId++, tab);
+  }
+  return workspace;
+}
+
+function newWorkspace(name, project = {}) {
+  let id = 0;
+  while (workspaces.has(id)) id++;
+  return mountWorkspace({ ...project, id, name });
+}
+
+function serializeTabs(entries, activeId) {
+  return {
+    tabs: entries.map(([, tab]) => tab.url),
+    queries: entries.map(([, tab]) => tab.webSearch?.query || ''),
+    activeIndex: Math.max(0, entries.findIndex(([id]) => id === activeId)),
+    pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
+  };
+}
+
 function saveSession() {
-  if (!tauri) return;
+  if (!tauri) return false;
   try {
     const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
     for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      workspaces: [...workspaces.values()].map(({ id, name, activeId }) => {
-        const entries = groups.get(id);
-        return {
-          id,
-          name,
-          tabs: entries.map(([, tab]) => tab.url),
-          queries: entries.map(([, tab]) => tab.webSearch?.query || ''),
-          activeIndex: entries.findIndex(([tabId]) => tabId === activeId),
-          pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
-        };
-      }),
+      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId }) => ({
+        id, name, notes, ...serializeTabs(groups.get(id), activeId),
+      })),
+      projects,
       activeWorkspaceId: activeWorkspace.id,
       favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
       sidebar: sidebarSettings,
@@ -103,18 +126,25 @@ function saveSession() {
       searchProvider,
     }));
     storageFailed = false;
+    return true;
   } catch {
     if (!storageFailed) showError('O Orla não conseguiu salvar a sessão neste dispositivo.');
     storageFailed = true;
+    return false;
   }
 }
 
 const showOffline = initOffline();
 const downloads = initDownloads(invoke);
+const devtools = initDevTools(invoke, scheduleLayout);
 
 function render() {
   const tab = tabs.get(activeWorkspace.activeId);
+  devtools.setPage(tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null);
   workspaceControls.renderCurrent(activeWorkspace.name);
+  if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
+  byId('notes-workspace').textContent = activeWorkspace.name;
+  notesStatus.textContent = storageFailed ? 'Alterações ainda não salvas.' : 'Salvo neste dispositivo';
   updateWindowTitle();
   if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
   home.hidden = tab.loaded || Boolean(tab.webSearch);
@@ -154,6 +184,38 @@ function renderFavorites() {
     list.append(button);
   }
 }
+
+const bookmarkFile = byId('bookmarks-file');
+byId('bookmarks-import').addEventListener('click', () => bookmarkFile.click());
+bookmarkFile.addEventListener('change', async () => {
+  const file = bookmarkFile.files[0];
+  bookmarkFile.value = '';
+  if (!file) return;
+  const feedback = byId('bookmarks-status');
+  try {
+    const incoming = await readBookmarkFile(file);
+    const added = [];
+    for (const [url, title] of incoming) {
+      if (favorites.has(url)) continue;
+      favorites.set(url, title);
+      added.push(url);
+    }
+    if (added.length && !saveSession()) {
+      for (const url of added) favorites.delete(url);
+      throw new Error('Não foi possível salvar os favoritos neste dispositivo.');
+    }
+    renderFavorites();
+    render();
+    feedback.textContent = added.length ? added.length + (added.length === 1 ? ' favorito importado.' : ' favoritos importados.') : 'Os favoritos do arquivo já estão salvos.';
+  } catch (error) {
+    feedback.textContent = error.message;
+  }
+});
+
+notesInput.addEventListener('input', () => {
+  activeWorkspace.notes = workspaceNotes(notesInput.value);
+  notesStatus.textContent = saveSession() ? 'Salvo neste dispositivo' : 'Alterações ainda não salvas.';
+});
 
 function resumeRow(url, activate, title = '', date = null) {
   const row = document.createElement('li');
@@ -264,7 +326,9 @@ function stagePosition() {
 
 async function selectTab(id) {
   omnibox.close();
-  if (tabs.get(id)?.workspaceId !== activeWorkspace.id) return;
+  const workspace = workspaces.get(tabs.get(id)?.workspaceId);
+  if (!workspace) return;
+  if (workspace !== activeWorkspace) switchWorkspace(workspace, id);
   if (id !== activeWorkspace.activeId) {
     activeWorkspace.activeId = id;
     showCurrentAddress();
@@ -597,19 +661,13 @@ const workspaceControls = initWorkspaces({
     spaces: workspaceOptions(),
     activeId: activeWorkspace.id,
     canMove: hasContent(tabs.get(activeWorkspace.activeId)),
-    canRemove: workspaces.size > 1 && workspaceTabs().every(([, tab]) => !hasContent(tab)),
+    canRemove: workspaces.size > 1 && !activeWorkspace.notes.trim() && workspaceTabs().every(([, tab]) => !hasContent(tab)),
   }),
   select: (id) => schedule(() => {
     const workspace = workspaces.get(id);
     if (workspace) switchWorkspace(workspace);
   }),
-  create: (name) => schedule(() => {
-    let id = 0;
-    while (workspaces.has(id)) id++;
-    const workspace = { id, name, activeId: undefined, recentlyClosed: [] };
-    workspaces.set(id, workspace);
-    switchWorkspace(workspace);
-  }),
+  create: (name) => schedule(() => switchWorkspace(newWorkspace(name))),
   rename: (name) => schedule(() => {
     activeWorkspace.name = name;
     saveSession();
@@ -635,23 +693,64 @@ const workspaceControls = initWorkspaces({
   remove: () => schedule(() => {
     const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
     const entries = workspaceTabs();
-    if (!target || entries.some(([, tab]) => hasContent(tab))) return;
+    if (!target || activeWorkspace.notes.trim() || entries.some(([, tab]) => hasContent(tab))) return;
     for (const [id] of entries) tabs.delete(id);
     workspaces.delete(activeWorkspace.id);
     switchWorkspace(target);
   }),
 });
 
-function switchWorkspace(workspace) {
+function switchWorkspace(workspace, tabId = workspace.activeId) {
   omnibox.close();
   closeTabPreview();
   activeWorkspace = workspace;
-  if (workspace.activeId === undefined) createTab();
+  workspace.activeId = tabId;
   tabFilter.value = '';
   showCurrentAddress();
   saveSession();
   workspaceControls.close();
 }
+
+function addProject(project) {
+  projects.unshift(project);
+  if (saveSession()) return true;
+  projects.shift();
+  return false;
+}
+
+const projectControls = initProjects({
+  getProjects: () => projects,
+  getWorkspaceName: () => activeWorkspace.name,
+  open: openDialog,
+  importProject: addProject,
+  save: (name) => {
+    const entries = workspaceTabs().filter(([, tab]) => hasContent(tab));
+    const project = readSavedProject({
+      name, savedAt: Date.now(), notes: activeWorkspace.notes,
+      ...serializeTabs(entries, activeWorkspace.activeId),
+    });
+    if (!project) return 'Abra uma página ou escreva uma nota antes de salvar a sessão.';
+    return addProject(project) || 'Não foi possível gravar a sessão neste dispositivo.';
+  },
+  restore: (project) => schedule(async () => {
+    const workspace = newWorkspace(project.name, project);
+    switchWorkspace(workspace);
+    await syncView(workspace.activeId);
+  }),
+  remove: (project) => {
+    const index = projects.indexOf(project);
+    if (index < 0) return false;
+    projects.splice(index, 1);
+    if (saveSession()) return true;
+    projects.splice(index, 0, project);
+    return false;
+  },
+});
+
+byId('workspace-save-project').addEventListener('click', () => {
+  workspaceControls.close();
+  projectControls.openSave();
+});
 
 function reopenTab(entry = activeWorkspace.recentlyClosed.at(-1)) {
   const index = activeWorkspace.recentlyClosed.indexOf(entry);
@@ -810,8 +909,20 @@ providerInput.addEventListener('input', () => {
 const omnibox = initOmnibox({
   input: address,
   list: byId('address-suggestions'),
-  search: (query) => suggestPages(query, { tabs: workspaceTabs(), favorites, history, activeId: activeWorkspace.activeId }),
-  onSelect: (result) => schedule(() => result.kind === 'tab' ? selectTab(result.id) : go(result.url)),
+  search: (query) => suggestPages(query, {
+    tabs, favorites, history, workspaces, activeId: activeWorkspace.activeId, activeWorkspaceId: activeWorkspace.id,
+  }),
+  onSelect: (result) => schedule(async () => {
+    if (result.kind === 'tab') return selectTab(result.id);
+    if (result.kind === 'workspace') {
+      const workspace = workspaces.get(result.id);
+      if (!workspace) return;
+      switchWorkspace(workspace);
+      await syncView(workspace.activeId);
+      return;
+    }
+    return go(result.url);
+  }),
   onLayout: scheduleLayout,
 });
 
@@ -842,6 +953,7 @@ address.addEventListener('keydown', (event) => {
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'devtools': devtools.toggle(); return true;
     case 'address':
       omnibox.close();
       address.focus();
@@ -855,7 +967,15 @@ function runShortcut(action) {
 }
 
 document.addEventListener('keydown', (event) => {
-  if (!event.ctrlKey || event.altKey || event.metaKey || event.repeat || event.isComposing) return;
+  if (event.altKey || event.metaKey || event.isComposing) return;
+  const isDevTools = (event.key === 'F12' && !event.ctrlKey && !event.shiftKey)
+    || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'i');
+  if (isDevTools) {
+    event.preventDefault();
+    if (!event.repeat) runShortcut('devtools');
+    return;
+  }
+  if (!event.ctrlKey || event.repeat) return;
   const action = (event.shiftKey
     ? { t: 'reopen-tab' }
     : { l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
@@ -910,6 +1030,7 @@ initSidebar({
   onResize: scheduleLayout,
 });
 renderFavorites();
+projectControls.render();
 render();
 refreshTabList();
 if (tauri) {
@@ -937,6 +1058,7 @@ if (tauri) {
         return;
       }
       if (payload.finished) {
+        devtools.navigated(id);
         tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();
@@ -978,6 +1100,7 @@ if (tauri) {
     }));
     await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
     await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
+    await tauri.event.listen('orla-devtools', ({ payload }) => devtools.handle(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();
   });
