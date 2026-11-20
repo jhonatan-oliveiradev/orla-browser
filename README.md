@@ -48,3 +48,11 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - Use **Ctrl+F** para localizar texto na aba. **Enter** e **Shift+Enter** percorrem as ocorrências. **Esc** fecha a busca.
 - Em **Extensões**, selecione a pasta de uma extensão descompactada que contém `manifest.json`. É possível desativá-la, reativá-la e removê-la. Mantenha a pasta no local original.
 - O perfil WebView2 dos sites fica separado da interface do Orla. A atualização preserva os dados do Orla, mas os sites podem pedir login novamente. A instalação é por pasta. Dependendo da extensão, recursos que exigem um botão ou pop-up do Chrome podem ficar indisponíveis.
+
+### DevTools e ações da página
+
+- Em **DevTools → Posição**, encaixe o painel embaixo, à esquerda ou à direita. Arraste o divisor ou use as setas com o foco nele. O Orla lembra a posição e o tamanho.
+- **Elementos** destaca o nó na página ao apontar ou focar na árvore. O painel de estilos alterna entre valores computados e regras CSS que correspondem ao nó.
+- **Console** filtra texto e nível. Use as setas para percorrer as expressões enviadas na aba em inspeção. **Rede** mostra estados e permite abrir os detalhes de cada requisição, incluindo protocolo, duração e bytes quando disponíveis.
+- **Ações da página** reúne zoom, duplicação e cópia do endereço. O zoom é salvo por domínio e aceita **Ctrl++**, **Ctrl+-** e **Ctrl+0**. Use **Ctrl+Tab** e **Ctrl+Shift+Tab** para alternar abas do espaço atual.
+- **Extensões** mostra nome, versão e permissões declaradas no manifesto antes de confirmar a instalação de uma pasta local.

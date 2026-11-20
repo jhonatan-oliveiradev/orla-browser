@@ -563,3 +563,96 @@ dialog :is(input, select, button):focus-visible, #find-bar :is(input, button):fo
 :root[data-density="compact"] :is(dialog, .home-card) { padding: 13px; }
 
 #find-bar[hidden], .session-recovery[hidden] { display: none; }
+
+/* The native page viewport and the inspector occupy separate grid tracks. */
+.site-stage[data-devtools-dock="left"]:has(.devtools:not([hidden])) {
+  grid-template-columns: var(--devtools-size) minmax(0, 1fr);
+}
+.site-stage[data-devtools-dock="right"]:has(.devtools:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr) var(--devtools-size);
+}
+.stage-controls { grid-column: 1 / -1; }
+[data-devtools-dock="left"]:has(.devtools:not([hidden])) .site-viewport { grid-column: 2; }
+[data-devtools-dock="right"] .site-viewport { grid-column: 1; }
+[data-devtools-dock="bottom"] .devtools { height: var(--devtools-size); min-height: 0; }
+[data-devtools-dock="left"] .devtools { grid-column: 1; border-right: 1px solid var(--chrome-line); }
+[data-devtools-dock="right"] .devtools { grid-column: 2; border-left: 1px solid var(--chrome-line); }
+[data-devtools-dock]:not([data-devtools-dock="bottom"]) .devtools {
+  grid-row: 2;
+  height: auto;
+  min-height: 0;
+  border-top: 0;
+}
+[data-devtools-dock="left"] .devtools-divider { inset: 0 0 0 auto; }
+[data-devtools-dock="right"] .devtools-divider { inset: 0 auto 0 0; }
+[data-devtools-dock]:not([data-devtools-dock="bottom"]) .devtools-divider { width: 5px; height: auto; cursor: ew-resize; }
+
+.devtools {
+  --inspect-tag: light-dark(#823687, #e7a5df);
+  --inspect-attribute: light-dark(#205d96, #9ccaff);
+  --inspect-value: light-dark(#3b6732, #b9d993);
+  --inspect-comment: var(--muted);
+  --inspect-danger: light-dark(#a12739, #ff9aa6);
+  --inspect-warning: light-dark(#7e5208, #f2cb78);
+  --inspect-success: light-dark(#216450, #84dcb8);
+  --inspect-neutral: var(--muted);
+  container-type: inline-size;
+  background: var(--night);
+}
+.devtools-header { min-width: 0; flex-wrap: wrap; }
+#devtools-heading { margin-right: 2px; }
+#devtools-position { margin-left: auto; }
+#devtools-close { margin-left: 0; }
+.devtools :is(select, input) { color: var(--text); }
+.devtools select {
+  max-width: 100%; min-height: 27px; padding-inline: 4px;
+  border: 1px solid var(--chrome-line); border-radius: 5px; background: var(--graphite);
+  font: inherit; font-size: 11px;
+}
+.devtools-syntax-tag { color: var(--inspect-tag); }
+.devtools-syntax-attribute, #devtools-styles dt { color: var(--inspect-attribute); }
+.devtools-syntax-value { color: var(--inspect-value); }
+.devtools-syntax-comment { color: var(--inspect-comment); }
+#devtools-console-list [data-category="error"] small,
+.devtools tr[data-status="error"] td:nth-child(2) { color: var(--inspect-danger); }
+#devtools-console-list [data-category="warning"] small,
+.devtools tr[data-status="warning"] td:nth-child(2) { color: var(--inspect-warning); }
+.devtools tr[data-status="success"] td:nth-child(2) { color: var(--inspect-success); }
+.devtools tr[data-status="pending"] td:nth-child(2) { color: var(--inspect-neutral); }
+#devtools-console-list [data-level="resultado"] small { color: var(--inspect-success); }
+#devtools-console-list [data-level="entrada"] small { color: var(--inspect-attribute); }
+#devtools-console-list [data-category="error"] { background: color-mix(in srgb, var(--inspect-danger) 7%, transparent); }
+#devtools-console-list [data-category="warning"] { background: color-mix(in srgb, var(--inspect-warning) 7%, transparent); }
+.devtools-keep { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 11px; }
+.devtools .devtools-keep input { min-width: auto; margin: 0; accent-color: var(--accent); }
+.devtools td:last-child button {
+  max-width: 100%; min-height: 24px; padding: 2px 4px; text-align: left;
+  font: inherit; overflow-wrap: anywhere; color: var(--inspect-attribute);
+}
+.devtools td:last-child [aria-expanded="true"] { background: var(--active-surface); }
+#devtools-request-details { min-height: 0; max-height: 50%; overflow: auto; border-top: 1px solid var(--line); }
+#devtools-request-details .devtools-actions { justify-content: space-between; align-items: center; }
+#devtools-request-fields { margin: 5px 8px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; font: 11px ui-monospace, Consolas, monospace; }
+#devtools-request-fields dt { color: var(--muted); }
+#devtools-request-fields dd { margin: 0; overflow-wrap: anywhere; }
+@container (max-width: 470px) {
+  .devtools-elements { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, .9fr); }
+  .devtools-column + .devtools-column { border-left: 0; border-top: 1px solid var(--chrome-line); }
+  .devtools-header .devtools-tabs { order: 1; flex-basis: 100%; }
+  #devtools-site { display: none; }
+  .devtools-actions { flex-wrap: wrap; }
+  .devtools th, .devtools td { padding-inline: 3px; }
+}
+#page-dialog { width: 350px; }
+.page-zoom { display: flex; align-items: center; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--chrome-line); }
+.page-zoom span { margin-right: auto; color: var(--muted); }
+.page-zoom button { background: var(--graphite); min-width: 36px; }
+#page-options-status:empty { display: none; }
+#extension-review { margin-top: 10px; padding: 9px 11px; background: var(--graphite); border: 1px solid var(--chrome-line); border-radius: 7px; }
+#extension-review :is(h3, h4, p) { margin: 4px 0; }
+#extension-permissions { max-height: 95px; overflow: auto; font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+#extension-review[hidden], #extension-permissions-empty[hidden] { display: none; }
+#devtools-rules { min-height: 0; overflow: auto; font: 11px ui-monospace, Consolas, monospace; }
+#devtools-rules section { padding: 6px 8px; border-bottom: 1px solid var(--chrome-line); }
+#devtools-rules h3 { margin: 0 0 4px; color: var(--inspect-tag); overflow-wrap: anywhere; font: inherit; }
+#devtools-rules pre { margin: 0; padding-inline-start: 9px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--inspect-attribute); }

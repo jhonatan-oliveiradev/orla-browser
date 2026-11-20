@@ -16,7 +16,7 @@ const fixture = createServer((request, response) => {
     return;
   }
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end('<!doctype html><title>Teste local Orla</title><main><p>marcador</p><p>marcador</p><a id="download" href="/fixture.txt" download>Baixar</a></main>');
+  response.end('<!doctype html><title>Teste local Orla</title><style>body{background:white}</style><main><p>marcador</p><p>marcador</p><a id="download" href="/fixture.txt" download>Baixar</a></main>');
 });
 fixture.listen(0, '127.0.0.1');
 await once(fixture, 'listening');

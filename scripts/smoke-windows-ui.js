@@ -58,12 +58,34 @@
       click('#find-close');
       shortcut('F12');
       await until('A DevTools integrada não inspecionou o documento.', () => contains('#devtools-tree', '<body>'));
+      const stage = get('#site-stage');
+      const select = get('#devtools-position');
+      const previous = get('#site-viewport').getBoundingClientRect();
+      select.value = 'left';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await until('A DevTools não reservou espaço à esquerda.', () => stage.dataset.devtoolsDock === 'left' && get('#site-viewport').getBoundingClientRect().x > previous.x);
+      const body = [...get('#devtools-tree').querySelectorAll('[data-inspect-node]')].find((node) => node.textContent === '<body>');
+      body.click();
+      const styleMode = get('#devtools-style-view');
+      styleMode.value = 'rules';
+      styleMode.dispatchEvent(new Event('change', { bubbles: true }));
+      await until('As regras CSS do elemento não apareceram.', () => get('#devtools-rules section'));
       click('#devtools-close');
+
+      click('#page-options');
+      await until('O menu da página não abriu.', () => get('#page-dialog').open);
+      click('#page-zoom-in');
+      await until('O zoom não mudou para 110%.', () => get('#page-zoom-reset').textContent === '110%');
+      click('#page-zoom-reset');
+      await until('O zoom não voltou a 100%.', () => get('#page-zoom-reset').textContent === '100%');
+      get('#page-dialog').close();
 
       click('#extensions-toggle');
       await until('O gerenciador de extensões não abriu.', () => get('#extensions-dialog').open && !get('#extensions-dialog').hasAttribute('aria-busy'));
       fill('#extension-path', extension);
       get('#extension-form').requestSubmit();
+      await until('A revisão do manifesto não abriu.', () => !get('#extension-review').hidden);
+      click('#extension-confirm');
       await until('A extensão não foi instalada.', () => {
         const status = get('#extensions-status').innerText;
         if (!get('#extensions-dialog').hasAttribute('aria-busy') && !contains('#extensions-list', 'Orla smoke fixture')) {

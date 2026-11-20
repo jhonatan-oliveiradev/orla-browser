@@ -4,7 +4,53 @@ export function initExtensions(invoke) {
   const status = document.getElementById('extensions-status');
   const form = document.getElementById('extension-form');
   const path = document.getElementById('extension-path');
+  const review = document.getElementById('extension-review');
+  const confirm = document.getElementById('extension-confirm');
+  let reviewedPath;
   let busy = false;
+
+  function clearReview() {
+    reviewedPath = undefined;
+    review.hidden = true;
+  }
+
+  async function preview() {
+    if (busy) return;
+    const selected = path.value;
+    clearReview();
+    busy = true;
+    dialog.setAttribute('aria-busy', 'true');
+    status.textContent = 'Lendo manifesto…';
+    try {
+      const info = await invoke('extension_action', { action: 'preview', path: selected });
+      if (selected !== path.value || !dialog.open) return;
+      document.getElementById('extension-review-title').textContent = info.name;
+      document.getElementById('extension-review-version').textContent =
+        'Versão ' + info.version + (Number.isInteger(info.manifestVersion) ? ' · Manifest V' + info.manifestVersion : '');
+      const list = document.getElementById('extension-permissions');
+      list.replaceChildren();
+      for (const permission of info.permissions) {
+        const item = document.createElement('li');
+        item.textContent = permission;
+        list.append(item);
+      }
+      if (info.truncated) {
+        const item = document.createElement('li');
+        item.textContent = 'Consulte o manifesto para ver as demais permissões.';
+        list.append(item);
+      }
+      document.getElementById('extension-permissions-empty').hidden = Boolean(list.childElementCount);
+      reviewedPath = selected;
+      review.hidden = false;
+      status.textContent = '';
+      confirm.focus();
+    } catch (error) {
+      status.textContent = String(error.message ?? error);
+    } finally {
+      busy = false;
+      dialog.removeAttribute('aria-busy');
+    }
+  }
 
   function actionButton(text, action, dangerous = false) {
     const button = document.createElement('button');
@@ -56,7 +102,11 @@ export function initExtensions(invoke) {
     try {
       if (action !== 'list') await invoke('extension_action', { action, ...args });
       await load();
-      if (action === 'install') form.reset();
+      if (action === 'install') {
+        form.reset();
+        clearReview();
+        path.focus();
+      }
       status.textContent = {
         list: '',
         install: 'Extensão adicionada.',
@@ -77,8 +127,10 @@ export function initExtensions(invoke) {
     browse.disabled = true;
     try {
       const selected = await invoke('choose_extension_folder');
-      if (selected) path.value = selected;
-      path.focus();
+      if (selected) {
+        path.value = selected;
+        await preview();
+      } else path.focus();
     } catch (error) {
       status.textContent = String(error.message ?? error);
     } finally {
@@ -86,9 +138,14 @@ export function initExtensions(invoke) {
     }
   });
 
+  path.addEventListener('input', clearReview);
+  dialog.addEventListener('close', clearReview);
+  confirm.addEventListener('click', () => {
+    if (reviewedPath && reviewedPath === path.value) operate('install', { path: reviewedPath });
+  });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    operate('install', { path: path.value });
+    preview();
   });
 
   return { load: () => operate('list') };

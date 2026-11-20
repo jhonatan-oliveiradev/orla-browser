@@ -1,6 +1,7 @@
 import { duckDuckGo, resolveNavigation } from './address.js';
 import { readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
+import { initPageActions } from './page-actions.js';
 import { initDevTools } from './devtools.js';
 import { initExtensions } from './extensions.js';
 import { initFind } from './find.js';
@@ -146,12 +147,17 @@ const find = initFind(invoke, (focusId) => {
   else scheduleLayout();
 });
 const devtools = initDevTools(invoke, scheduleLayout);
+const pageActions = initPageActions(invoke,
+  () => byId('page-dialog').close(),
+  (url) => schedule(() => openTab(url)),
+);
 
 function render() {
   const tab = tabs.get(activeWorkspace.activeId);
   const page = tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null;
   devtools.setPage(page);
   find.setPage(page);
+  pageActions.set(page);
   workspaceControls.renderCurrent(activeWorkspace.name);
   if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
   byId('notes-workspace').textContent = activeWorkspace.name;
@@ -605,6 +611,7 @@ async function syncView(focusTabId) {
     tab.loaded = true;
     render();
   }
+  await pageActions.apply().catch(showError);
   await invoke('show_tab', { id: activeWorkspace.activeId, focus: focusTabId === activeWorkspace.activeId, ...stagePosition() });
 }
 
@@ -778,6 +785,7 @@ for (const button of document.querySelectorAll('[data-dismiss]')) {
 }
 byId('downloads-toggle').addEventListener('click', () => openDialog(byId('downloads-dialog')));
 byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeWorkspace.activeId).url)));
+byId('page-options').addEventListener('click', () => openDialog(byId('page-dialog')));
 byId('extensions-toggle').addEventListener('click', () => {
   openDialog(byId('extensions-dialog'));
   void extensions.load();
@@ -977,6 +985,19 @@ function runShortcut(action) {
       address.focus();
       address.select();
       return true;
+    case 'next-tab':
+    case 'previous-tab':
+      schedule(() => {
+        const ids = orderedTabs().map(([id]) => id);
+        const offset = action === 'next-tab' ? 1 : -1;
+        return selectTab(ids[(ids.indexOf(activeWorkspace.activeId) + offset + ids.length) % ids.length]);
+      });
+      return true;
+    case 'zoom-in':
+    case 'zoom-out':
+    case 'zoom-reset':
+      schedule(() => pageActions.adjust(action));
+      return true;
     case 'new-tab': schedule(() => openTab()); return true;
     case 'reopen-tab': schedule(() => reopenTab()); return true;
     case 'close-tab': schedule(() => closeTab(activeWorkspace.activeId)); return true;
@@ -994,9 +1015,10 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (!event.ctrlKey || event.repeat) return;
-  const action = (event.shiftKey
-    ? { t: 'reopen-tab' }
-    : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
+  const key = event.key.toLowerCase();
+  const action = ({ '+': 'zoom-in', '=': 'zoom-in', '-': 'zoom-out' })[key] || (event.shiftKey
+    ? { t: 'reopen-tab', tab: 'previous-tab' }
+    : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab', tab: 'next-tab', '0': 'zoom-reset' })[key];
   if (runShortcut(action)) event.preventDefault();
 });
 
@@ -1085,6 +1107,7 @@ if (tauri) {
       if (payload.finished) {
         devtools.navigated(id);
         find.navigated(id);
+        if (id === activeWorkspace.activeId) await pageActions.apply().catch(showError);
         tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();

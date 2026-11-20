@@ -21,6 +21,7 @@
       <kbd aria-hidden="true">Ctrl+L</kbd>
     </form>
     <div class="toolbar-tools">
+      <button id="page-options" class="icon" type="button" aria-label="Ações da página" title="Ações da página" aria-haspopup="dialog" aria-controls="page-dialog" disabled data-static-icon="more"></button>
       <button id="favorite-page" class="icon" aria-label="Favoritar página" aria-pressed="false" disabled></button>
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
       <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
@@ -215,6 +216,11 @@
             <button id="devtools-tab-console" type="button" role="tab" aria-selected="false" aria-controls="devtools-console" tabindex="-1" data-devtools-section="console">Console</button>
             <button id="devtools-tab-network" type="button" role="tab" aria-selected="false" aria-controls="devtools-network" tabindex="-1" data-devtools-section="network">Rede</button>
           </div>
+          <select id="devtools-position" aria-label="Posição da DevTools">
+            <option value="bottom">Embaixo</option>
+            <option value="left">À esquerda</option>
+            <option value="right">À direita</option>
+          </select>
           <button id="devtools-close" class="icon" type="button" title="Fechar DevTools" aria-label="Fechar DevTools" data-static-icon="close"></button>
         </header>
         <p id="devtools-status" role="status"></p>
@@ -227,14 +233,26 @@
           </div>
           <div class="devtools-column">
             <div class="devtools-actions">
-              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos computados" placeholder="Filtrar estilos computados">
+              <select id="devtools-style-view" aria-label="Modo de estilos">
+                <option value="computed">Computados</option>
+                <option value="rules">Regras CSS</option>
+              </select>
+              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos" placeholder="Filtrar estilos">
             </div>
             <p id="devtools-style-empty">Selecione um elemento para ver seus estilos.</p>
             <dl id="devtools-styles"></dl>
+            <div id="devtools-rules" hidden></div>
           </div>
         </section>
         <section id="devtools-console" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-console" hidden>
           <div class="devtools-actions">
+            <select id="devtools-level" aria-label="Nível das mensagens">
+              <option value="all">Todos os níveis</option>
+              <option value="error">Erros</option>
+              <option value="warning">Avisos</option>
+              <option value="info">Informações</option>
+            </select>
+            <input id="devtools-console-filter" type="search" aria-label="Filtrar mensagens do console" placeholder="Filtrar mensagens">
             <button id="devtools-clear-console" type="button">Limpar console</button>
           </div>
           <div class="devtools-scroll">
@@ -250,6 +268,7 @@
         <section id="devtools-network" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-network" hidden>
           <div class="devtools-actions">
             <input id="devtools-network-filter" type="search" aria-label="Filtrar requisições" placeholder="Filtrar requisições">
+            <label class="devtools-keep"><input id="devtools-keep-network" type="checkbox">Preservar log</label>
             <button id="devtools-clear-network" type="button">Limpar rede</button>
           </div>
           <div class="devtools-scroll">
@@ -259,6 +278,10 @@
               <tbody id="devtools-requests"></tbody>
             </table>
           </div>
+          <section id="devtools-request-details" aria-label="Detalhes da requisição" hidden>
+            <div class="devtools-actions"><strong>Requisição</strong><button type="button" id="devtools-request-close">Fechar detalhes</button></div>
+            <dl id="devtools-request-fields"></dl>
+          </section>
         </section>
       </section>
     </div>
@@ -363,6 +386,21 @@
     <label class="setting-row"><span>Animar fundo da Nova Aba</span><input id="appearance-motion" type="checkbox" checked></label>
     <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
   </dialog>
+  <dialog id="page-dialog" aria-labelledby="page-heading">
+    <header class="dialog-heading">
+      <h2 id="page-heading">Ações da página</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar ações da página" data-static-icon="close"></button>
+    </header>
+    <div class="page-zoom" role="group" aria-label="Zoom da página">
+      <span>Zoom</span>
+      <button type="button" id="page-zoom-out" aria-label="Diminuir zoom" title="Ctrl+-">−</button>
+      <button type="button" id="page-zoom-reset" title="Restaurar zoom (Ctrl+0)" aria-label="Restaurar zoom">100%</button>
+      <button type="button" id="page-zoom-in" aria-label="Aumentar zoom" title="Ctrl++">+</button>
+    </div>
+    <button type="button" id="page-duplicate">Duplicar aba</button>
+    <button type="button" id="page-copy">Copiar endereço</button>
+    <p id="page-options-status" class="collection-status" role="status"></p>
+  </dialog>
   <dialog id="extensions-dialog" aria-labelledby="extensions-heading">
     <header class="dialog-heading">
       <h2 id="extensions-heading">Extensões</h2>
@@ -375,9 +413,17 @@
       <div class="workspace-fields">
         <input id="extension-path" type="text" required placeholder="Selecione ou cole o caminho da pasta" aria-describedby="extension-help" spellcheck="false" autocomplete="off">
         <button id="extension-browse" type="button">Escolher pasta</button>
-        <button class="primary" type="submit">Adicionar</button>
+        <button class="primary" type="submit">Revisar</button>
       </div>
-      <p id="extension-help">Use uma pasta confiável com <code>manifest.json</code> na raiz e mantenha os arquivos no local. Algumas extensões dependem de menus ou pop-ups do Chrome.</p>
+      <section id="extension-review" aria-labelledby="extension-review-title" hidden>
+        <h3 id="extension-review-title"></h3>
+        <p id="extension-review-version"></p>
+        <h4>Permissões declaradas</h4>
+        <ul id="extension-permissions"></ul>
+        <p id="extension-permissions-empty" hidden>O manifesto não declara permissões ou acesso a sites.</p>
+        <button id="extension-confirm" type="button" class="primary">Instalar extensão</button>
+      </section>
+      <p id="extension-help">Use uma pasta confiável com <code>manifest.json</code> na raiz e mantenha os arquivos no local. A instalação pela Chrome Web Store e botões de extensão ainda não estão disponíveis.</p>
     </form>
     <p id="extensions-status" class="collection-status" role="status"></p>
   </dialog>

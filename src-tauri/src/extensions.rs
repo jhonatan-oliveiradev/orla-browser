@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::OnceLock};
+use std::{io::Read, path::PathBuf, sync::OnceLock};
 
 use tauri::{async_runtime::{channel, Mutex}, webview::WebviewBuilder, AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
 use webview2_com::{
@@ -50,11 +50,42 @@ fn folder(value: Option<String>) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+fn preview(path: PathBuf) -> Result<serde_json::Value, String> {
+    let file = std::fs::File::open(path.join("manifest.json")).map_err(|error| error.to_string())?;
+    let mut bytes = Vec::new();
+    file.take(524_289).read_to_end(&mut bytes).map_err(|error| error.to_string())?;
+    if bytes.len() > 524_288 { return Err("O manifesto excede 512 KB.".into()); }
+    let manifest: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| "O manifesto deve ser um JSON válido.")?;
+    let name = manifest["name"].as_str().filter(|value| !value.trim().is_empty()).ok_or("O manifesto precisa indicar o nome da extensão.")?;
+    let version = manifest["version"].as_str().ok_or("O manifesto precisa indicar a versão da extensão.")?;
+    let mut permissions = std::collections::BTreeSet::new();
+    for key in ["permissions", "host_permissions", "optional_permissions", "optional_host_permissions"] {
+        for value in manifest[key].as_array().into_iter().flatten().filter_map(serde_json::Value::as_str) {
+            let label = if key.starts_with("optional") { format!("{value} (opcional)") } else { value.to_owned() };
+            permissions.insert(label.chars().take(300).collect::<String>());
+        }
+    }
+    for script in manifest["content_scripts"].as_array().into_iter().flatten() {
+        for site in script["matches"].as_array().into_iter().flatten().filter_map(serde_json::Value::as_str) {
+            permissions.insert(site.chars().take(300).collect());
+        }
+    }
+    let truncated = permissions.len() > 100;
+    Ok(serde_json::json!({
+        "name": name.chars().take(140).collect::<String>(),
+        "version": version.chars().take(32).collect::<String>(),
+        "manifestVersion": manifest["manifest_version"],
+        "permissions": permissions.into_iter().take(100).collect::<Vec<_>>(),
+        "truncated": truncated,
+    }))
+}
+
 #[tauri::command]
 pub async fn extension_action(
     caller: Webview, app: AppHandle, action: String, path: Option<String>, id: Option<String>, enabled: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     ui_only(&caller)?;
+    if action == "preview" { return preview(folder(path)?); }
     let path = match action.as_str() {
         "install" => Some(folder(path)?),
         "list" => None,

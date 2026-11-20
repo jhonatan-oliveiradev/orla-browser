@@ -11,6 +11,7 @@ const paths = {
   maximize: 'M5 5h14v14H5V5Z',
   restore: 'M8 4h12v12 M4 8h12v12H4V8Z',
   devtools: 'M8 6l-5 6 5 6 M16 6l5 6-5 6 M14 4l-4 16',
+  more: 'M5 12h.01 M12 12h.01 M19 12h.01',
   extensions: 'M4 8h4V5a2 2 0 0 1 4 0v3h5v4h2a2 2 0 0 1 0 4h-2v4H4v-4h2a2 2 0 0 0 0-4H4z',
   up: 'm6 15 6-6 6 6',
   down: 'm6 9 6 6 6-6',

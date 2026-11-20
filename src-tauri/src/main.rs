@@ -105,6 +105,7 @@ async fn navigate_tab(
     let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
     let bounds = viewport.bounds(&window)?;
     let builder = WebviewBuilder::new(label, WebviewUrl::External(Url::parse("about:blank").unwrap()))
+        .zoom_hotkeys_enabled(false)
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
         .on_document_title_changed(|view, title| {
@@ -191,6 +192,16 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
     .map_err(as_message)
 }
 
+#[tauri::command]
+async fn zoom_tab(caller: Webview, app: AppHandle, id: u32, percent: u16) -> CommandResult {
+    ui_only(&caller)?;
+    if !(50..=200).contains(&percent) {
+        return Err("Zoom fora do intervalo permitido.".into());
+    }
+    let view = app.get_webview(&tab_label(id)).ok_or("Aba indisponível.")?;
+    view.set_zoom(f64::from(percent) / 100.0).map_err(as_message)
+}
+
 #[cfg(not(windows))]
 mod site_events {
     #[tauri::command]
@@ -249,6 +260,7 @@ fn main() {
             show_tab,
             resize_tabs,
             tab_action,
+            zoom_tab,
             devtools::devtools_action,
             extensions::extension_action,
             extensions::choose_extension_folder,
