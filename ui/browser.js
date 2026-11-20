@@ -42,9 +42,10 @@ try {
   // Navigation remains available if the WebView storage cannot be read.
 }
 const session = readSession(snapshot);
+const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
 const tabs = new Map(session.tabs.map((url, id) => [id, {
-  url, loaded: false, pinned: session.pinnedIndices.has(id), title: '',
+  url, loaded: false, pinned: session.pinnedIndices.has(id), title: knownTitles.get(url) || '',
 }]));
 let activeId = session.activeIndex;
 let sidebarSettings = session.sidebar;
@@ -95,6 +96,7 @@ const downloads = initDownloads(invoke);
 
 function render() {
   const tab = tabs.get(activeId);
+  updateWindowTitle();
   if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
   home.hidden = tab.loaded || Boolean(tab.webSearch);
   showOffline(tab.failure);
@@ -224,8 +226,8 @@ function showCurrentAddress() {
 }
 
 function stagePosition() {
-  const { left, top } = stage.getBoundingClientRect();
-  return { sidebarLeft: left, siteTop: top };
+  const { x, y, width, height } = stage.getBoundingClientRect();
+  return { viewport: { x, y, width, height } };
 }
 
 async function selectTab(id) {
@@ -261,10 +263,85 @@ async function closeTab(id) {
   await syncView();
 }
 
+const tabPreview = byId('tab-preview');
+const previewImage = byId('tab-preview-image');
+let previewTarget;
+let previewTimer;
+
+function closeTabPreview() {
+  clearTimeout(previewTimer);
+  previewTarget?.removeAttribute('aria-describedby');
+  previewTarget = undefined;
+  tabPreview.hidden = true;
+}
+
+function renderTabPreview() {
+  if (!previewTarget) return;
+  const tab = tabs.get(Number(previewTarget.dataset.tabId));
+  if (!tab?.url) return;
+  const description = byId('tab-preview-description');
+  description.textContent = tab.description || '';
+  description.hidden = !description.textContent;
+  byId('tab-preview-title').textContent = tab.socialTitle || tab.title || new URL(tab.url).hostname;
+  byId('tab-preview-host').textContent = new URL(tab.url).hostname;
+  previewImage.hidden = !tab.thumbnail;
+  if (tab.thumbnail) previewImage.src = tab.thumbnail;
+  else previewImage.removeAttribute('src');
+  previewTarget.setAttribute('aria-describedby', 'tab-preview');
+  tabPreview.hidden = false;
+}
+
+function queueTabPreview(button) {
+  if (previewTarget === button) return;
+  closeTabPreview();
+  const id = Number(button.dataset.tabId);
+  const tab = tabs.get(id);
+  if (!tab?.url || sidebarSettings.collapsed) return;
+  previewTarget = button;
+  previewTimer = setTimeout(() => {
+    renderTabPreview();
+    if (!tauri || !tab.loaded || !tab.ready || tab.failure || tab.thumbnail) return;
+    const { width, height } = stage.getBoundingClientRect();
+    invoke('tab_preview', { id, width: Math.round(width), height: Math.round(height) }).catch(() => {
+      // Metadata remains available if a page cannot be captured.
+    });
+  }, 350);
+}
+
+function updateWindowTitle() {
+  const title = tabs.get(activeId)?.title;
+  const fullTitle = title ? title + ' · Orla Browser' : 'Orla Browser';
+  if (document.title === fullTitle) return;
+  document.title = fullTitle;
+  tauri?.window?.getCurrentWindow().setTitle?.(fullTitle).catch(showError);
+}
+
+function updateTabTitle(id, url, title) {
+  const tab = tabs.get(id);
+  if (!tab || !title) return;
+  tab.pendingTitle = { url, title };
+  if (tab.url !== url || tab.title === title) return;
+  tab.title = title;
+  if (id === activeId) updateWindowTitle();
+  if (tab.visit?.url === url && history.includes(tab.visit)) {
+    tab.visit.title = title;
+    saveHistory();
+  }
+  refreshTabList();
+}
+
+function resetTabPreview(tab) {
+  delete tab.socialTitle;
+  delete tab.description;
+  delete tab.thumbnail;
+  delete tab.ready;
+}
+
 function refreshTabList() {
   const focused = document.activeElement;
   const target = focused?.closest('#tab-list button')?.dataset.focusKey;
   const scroll = tabList.scrollTop;
+  closeTabPreview();
   tabList.replaceChildren();
   reopenButton.disabled = !recentlyClosed.length;
   const filter = sidebarSettings.collapsed ? '' : (tabFilter.value || '').trim().toLocaleLowerCase('pt-BR');
@@ -278,11 +355,30 @@ function refreshTabList() {
     row.dataset.pinned = String(tab.pinned);
     const select = document.createElement('button');
     select.textContent = sidebarSettings.collapsed ? Array.from(title)[0].toUpperCase() : title;
-    select.title = tab.url || title;
+    select.dataset.tabId = String(id);
+    if (!tab.url) select.title = title;
     select.setAttribute('aria-label', title);
     select.dataset.focusKey = 'select-' + id;
     if (id === activeId) select.setAttribute('aria-current', 'true');
-    select.addEventListener('click', () => schedule(() => selectTab(id)));
+    select.addEventListener('click', () => {
+      closeTabPreview();
+      schedule(() => selectTab(id));
+    });
+    select.addEventListener('pointerenter', (event) => {
+      if (event.pointerType !== 'touch') queueTabPreview(select);
+    });
+    select.addEventListener('pointerleave', () => {
+      if (previewTarget === select) closeTabPreview();
+    });
+    select.addEventListener('focus', () => {
+      if (select.matches(':focus-visible')) queueTabPreview(select);
+    });
+    select.addEventListener('blur', () => {
+      if (previewTarget === select) closeTabPreview();
+    });
+    select.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && previewTarget === select) closeTabPreview();
+    });
 
     const close = document.createElement('button');
     close.textContent = '×';
@@ -346,7 +442,7 @@ async function syncView(focusTabId) {
     tab.loaded = true;
     render();
   }
-  await invoke('show_tab', { id: activeId, focus: focusTabId === activeId });
+  await invoke('show_tab', { id: activeId, focus: focusTabId === activeId, ...stagePosition() });
 }
 
 async function go(url) {
@@ -363,7 +459,10 @@ async function go(url) {
   } catch {
     tab.failure = 'navigation';
   }
-  if (tab.url !== target) tab.title = '';
+  if (tab.url !== target) {
+    resetTabPreview(tab);
+    tab.title = '';
+  }
   tab.url = target;
   delete tab.webSearch;
   tab.loaded = true;
@@ -578,14 +677,26 @@ document.addEventListener('keydown', (event) => {
 });
 
 let resizeFrame;
+let resizing = false;
+let resizePending = false;
+
 function scheduleLayout() {
   if (!tauri) return;
-  cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(() => schedule(() => invoke('resize_tabs', {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    ...stagePosition(),
-  })));
+  resizePending = true;
+  if (resizeFrame || resizing) return;
+  resizeFrame = requestAnimationFrame(async () => {
+    resizeFrame = undefined;
+    resizePending = false;
+    resizing = true;
+    try {
+      await invoke('resize_tabs', stagePosition());
+    } catch (error) {
+      showError(error);
+    } finally {
+      resizing = false;
+      if (resizePending) scheduleLayout();
+    }
+  });
 }
 
 initAppearance(appearance, (settings) => {
@@ -616,6 +727,7 @@ if (tauri) {
       const tab = tabs.get(id);
       const url = websiteAddress(payload.url);
       if (!tab || !url) return;
+      if (!payload.finished) resetTabPreview(tab);
       if (url !== tab.url) {
         tab.url = url;
         tab.title = tab.pendingTitle?.url === url ? tab.pendingTitle.title : '';
@@ -633,24 +745,36 @@ if (tauri) {
         return;
       }
       if (payload.finished) {
+        tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();
       }
       if (!home.hidden && !byId('home-resume').hidden) renderResume();
     }));
     await tauri.event.listen('orla-title', ({ payload }) => schedule(() => {
-      const tab = tabs.get(Number(payload.id.slice(4)));
       const url = websiteAddress(payload.url);
-      const title = pageTitle(payload.title);
-      if (!tab || !url || !title) return;
-      tab.pendingTitle = { url, title };
-      if (tab.url !== url) return;
-      tab.title = title;
-      if (tab.visit?.url === url && history.includes(tab.visit)) {
-        tab.visit.title = title;
-        saveHistory();
-      }
+      if (url) updateTabTitle(Number(payload.id.slice(4)), url, pageTitle(payload.title));
     }));
+    await tauri.event.listen('orla-page-metadata', ({ payload }) => schedule(() => {
+      const id = Number(payload.id.slice(4));
+      const tab = tabs.get(id);
+      const url = websiteAddress(payload.page.url);
+      if (!tab || !url || tab.url !== url || tab.failure) return;
+      tab.description = typeof payload.page.description === 'string'
+        ? payload.page.description.trim().slice(0, 320) : '';
+      tab.socialTitle = pageTitle(payload.page.socialTitle);
+      if (!tab.title) updateTabTitle(id, url, pageTitle(payload.page.title) || tab.socialTitle);
+      if (!tabPreview.hidden && Number(previewTarget?.dataset.tabId) === id) renderTabPreview();
+    }));
+    await tauri.event.listen('orla-tab-preview', ({ payload }) => {
+      const tab = tabs.get(payload.id);
+      const url = websiteAddress(payload.url);
+      const data = payload.image;
+      if (!tab || tab.url !== url || !tab.ready || tab.failure || typeof data !== 'string'
+        || data.length > 400000 || !/^[A-Za-z0-9+/]+=*$/.test(data)) return;
+      tab.thumbnail = 'data:image/jpeg;base64,' + data;
+      if (!tabPreview.hidden && Number(previewTarget?.dataset.tabId) === payload.id) renderTabPreview();
+    });
     await tauri.event.listen('orla-new-tab', ({ payload }) => {
       const url = websiteAddress(payload);
       if (url) schedule(() => openTab(url));
@@ -660,5 +784,6 @@ if (tauri) {
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();
   });
+  new ResizeObserver(scheduleLayout).observe(stage);
   window.addEventListener('resize', scheduleLayout);
 }

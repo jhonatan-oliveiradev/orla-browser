@@ -14,7 +14,7 @@
         "title": "Orla Browser",
         "width": 1200,
         "height": 730,
-        "minWidth": 680,
+        "minWidth": 460,
         "minHeight": 440,
         "decorations": false,
         "resizable": true,
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'"
+      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'"
     }
   },
   "bundle": {

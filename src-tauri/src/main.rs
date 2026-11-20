@@ -46,16 +46,33 @@ fn as_message(error: tauri::Error) -> String {
     error.to_string()
 }
 
-fn site_bounds(
-    width: f64, height: f64, sidebar_left: f64, site_top: f64,
-) -> (LogicalPosition<f64>, LogicalSize<f64>) {
-    let left = sidebar_left.clamp(RESIZE_EDGE, (width - RESIZE_EDGE - 1.0).max(RESIZE_EDGE));
-    let top = site_top.clamp(TOOLBAR, (height - RESIZE_EDGE - 1.0).max(TOOLBAR));
-    let size = LogicalSize::new(
-        (width - left - RESIZE_EDGE).max(1.0),
-        (height - top - RESIZE_EDGE).max(1.0),
-    );
-    (LogicalPosition::new(left, top), size)
+#[derive(serde::Deserialize)]
+struct Viewport {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+impl Viewport {
+    fn bounds(&self, window: &tauri::Window) -> Result<Rect, String> {
+        if ![self.x, self.y, self.width, self.height].iter().all(|value| value.is_finite()) {
+            return Err("Dimensões da página inválidas.".into());
+        }
+        let scale = window.scale_factor().map_err(as_message)?;
+        let client = window.inner_size().map_err(as_message)?.to_logical::<f64>(scale);
+        let right = (client.width - RESIZE_EDGE).max(RESIZE_EDGE + 1.0);
+        let bottom = (client.height - RESIZE_EDGE).max(TOOLBAR + 1.0);
+        let x = self.x.clamp(RESIZE_EDGE, right - 1.0);
+        let y = self.y.clamp(TOOLBAR, bottom - 1.0);
+        Ok(Rect {
+            position: LogicalPosition::new(x, y).into(),
+            size: LogicalSize::new(
+                self.width.clamp(1.0, right - x),
+                self.height.clamp(1.0, bottom - y),
+            ).into(),
+        })
+    }
 }
 
 fn tab_label(id: u32) -> String {
@@ -64,7 +81,7 @@ fn tab_label(id: u32) -> String {
 
 #[tauri::command]
 async fn navigate_tab(
-    caller: Webview, app: AppHandle, id: u32, address: String, sidebar_left: f64, site_top: f64,
+    caller: Webview, app: AppHandle, id: u32, address: String, viewport: Viewport,
 ) -> CommandResult {
     ui_only(&caller)?;
     let url = Url::parse(&address).map_err(|_| "Endereço inválido.".to_string())?;
@@ -78,12 +95,7 @@ async fn navigate_tab(
     }
 
     let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
-    let scale = window.scale_factor().map_err(as_message)?;
-    let size = window
-        .inner_size()
-        .map_err(as_message)?
-        .to_logical::<f64>(scale);
-    let (position, size) = site_bounds(size.width, size.height, sidebar_left, site_top);
+    let bounds = viewport.bounds(&window)?;
     let builder = WebviewBuilder::new(label, WebviewUrl::External(Url::parse("about:blank").unwrap()))
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
@@ -100,7 +112,7 @@ async fn navigate_tab(
                 );
             }
         });
-    let view = window.add_child(builder, position, size).map_err(as_message)?;
+    let view = window.add_child(builder, bounds.position, bounds.size).map_err(as_message)?;
     #[cfg(windows)]
     {
         shortcuts::attach(&view)?;
@@ -111,7 +123,7 @@ async fn navigate_tab(
 
 #[tauri::command]
 async fn show_tab(
-    caller: Webview, app: AppHandle, id: Option<u32>, focus: Option<bool>,
+    caller: Webview, app: AppHandle, id: Option<u32>, focus: Option<bool>, viewport: Option<Viewport>,
 ) -> CommandResult {
     ui_only(&caller)?;
     let active = id.map(tab_label);
@@ -126,6 +138,10 @@ async fn show_tab(
         }
     }
     if let Some(view) = active.and_then(|label| app.get_webview(&label)) {
+        if let Some(viewport) = viewport {
+            let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
+            view.set_bounds(viewport.bounds(&window)?).map_err(as_message)?;
+        }
         view.show().map_err(as_message)?;
         if focus == Some(true) {
             view.set_focus().map_err(as_message)?;
@@ -136,11 +152,11 @@ async fn show_tab(
 
 #[tauri::command]
 async fn resize_tabs(
-    caller: Webview, app: AppHandle, width: f64, height: f64, sidebar_left: f64, site_top: f64,
+    caller: Webview, app: AppHandle, viewport: Viewport,
 ) -> CommandResult {
     ui_only(&caller)?;
-    let (position, size) = site_bounds(width, height, sidebar_left, site_top);
-    let bounds = Rect { position: position.into(), size: size.into() };
+    let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
+    let bounds = viewport.bounds(&window)?;
     for (label, view) in app.webviews() {
         if label.starts_with("tab-") {
             view.set_bounds(bounds).map_err(as_message)?;
@@ -168,6 +184,11 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
 #[cfg(not(windows))]
 mod site_events {
     #[tauri::command]
+    pub fn tab_preview(id: u32, width: u32, height: u32) {
+        let _ = (id, width, height);
+    }
+
+    #[tauri::command]
     pub fn download_action(id: u32, action: String) -> super::CommandResult {
         let _ = (id, action);
         Err("Downloads estão disponíveis no Windows.".into())
@@ -182,6 +203,7 @@ fn main() {
             resize_tabs,
             tab_action,
             site_events::download_action,
+            site_events::tab_preview,
             search::search_web
         ])
         .run(tauri::generate_context!())

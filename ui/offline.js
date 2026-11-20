@@ -1,8 +1,11 @@
-const WIDTH = 540;
-const HEIGHT = 184;
-const FLOOR = 151;
-const RUNNER_X = 72;
-const SIZE = 24;
+const WIDTH = 576;
+const HEIGHT = 224;
+const FLOOR = 186;
+const RUNNER_X = 78;
+const SIZE = 36;
+const IMPACT_DURATION = .64;
+const PALETTE = ['', '#281522', '#fdf0fa', '#74224c', '#ffffff', '#dd4d9b'];
+const wrap = (position, span) => ((position % span) + span) % span;
 const RECORD_KEY = 'orla.offline.record.v1';
 
 const mascot = [
@@ -27,6 +30,7 @@ export function initOffline() {
   const recordLabel = document.getElementById('offline-record');
   const message = document.getElementById('offline-message');
   const ctx = canvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let record = bestScore();
   let score = 0;
   let distance = 0;
@@ -37,23 +41,80 @@ export function initOffline() {
   let frame = 0;
   let last = 0;
   let state = 'idle';
+  let impact = 0;
+  let impactStart = 0;
+
+  function drawMascot() {
+    const moving = !reducedMotion.matches;
+    const stride = moving ? Math.floor(distance / 9) % 4 : 0;
+    const airborne = y < FLOOR - SIZE;
+    const hit = state === 'impact' || state === 'over';
+    const pulse = Math.max(0, 1 - impact * 4);
+    const bodyY = Math.round(y) - (!hit && !airborne && stride % 2 ? 2 : 0);
+
+    ctx.save();
+    ctx.translate(RUNNER_X, bodyY);
+    if (hit && moving) {
+      ctx.translate(-Math.round(impact * 17), -Math.round(Math.sin(impact * Math.PI) * 17));
+      ctx.translate(20, 25);
+      ctx.rotate(-impact * .36);
+      ctx.scale(1 + pulse * .17, 1 - pulse * .29);
+      ctx.translate(-20, -25);
+    }
+    const blink = moving && state === 'running' && Math.floor(distance) % 380 > 364;
+    mascot.forEach((line, row) => {
+      for (let column = 0; column < line.length; column++) {
+        const pixel = line[column];
+        if (pixel === '0') continue;
+        if ((blink || hit) && ['3', '4'].includes(pixel) && row >= 7 && row <= 9) {
+          ctx.fillStyle = row === 8 ? PALETTE[3] : PALETTE[2];
+        } else {
+          ctx.fillStyle = PALETTE[pixel];
+        }
+        const foot = column < 10 ? stride : (stride + 2) % 4;
+        const lift = row === 17 && (airborne || foot === 1) ? 2 : 0;
+        ctx.fillRect(column * 2, row * 2 - lift, 2, 2);
+      }
+    });
+    ctx.restore();
+
+    if (hit && moving && impact < 1) {
+      for (let particle = 0; particle < 10; particle++) {
+        const direction = particle % 2 === 0 ? -1 : 1;
+        const x = RUNNER_X + 20 + direction * (10 + impact * (22 + particle * 3));
+        const height = (18 + particle * 6) * impact - 46 * impact * impact;
+        ctx.fillStyle = particle % 3 === 0 ? '#fff7fc' : '#ce247c';
+        ctx.globalAlpha = 1 - impact;
+        ctx.fillRect(Math.round(x), Math.round(bodyY + 12 - height), 3 + particle % 3, 3 + particle % 3);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
 
   function draw() {
     if (!ctx) return;
     ctx.fillStyle = '#ffe9f4';
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.fillStyle = '#fff3fa';
+    for (let x = 44; x < WIDTH; x += 144) {
+      const offset = Math.round(wrap(x - distance * .07, WIDTH + 62)) - 62;
+      const cloudY = 35 + x % 41;
+      ctx.fillRect(offset, cloudY, 58, 8);
+      ctx.fillRect(offset + 11, cloudY - 7, 33, 7);
+      ctx.fillRect(offset + 18, cloudY - 13, 16, 6);
+    }
     ctx.fillStyle = '#ffd2ea';
-    for (let x = 18; x < WIDTH; x += 58) {
-      const offset = Math.round((x - distance * .13) % WIDTH);
-      const h = 13 + (x % 35);
-      ctx.fillRect(offset, FLOOR - h, 52, h);
-      ctx.fillRect(offset + 7, FLOOR - h - 6, 38, 7);
-      ctx.fillRect(offset + 17, FLOOR - h - 12, 18, 6);
+    for (let x = 0; x < WIDTH + 58; x += 58) {
+      const offset = Math.round(wrap(x - distance * .13, WIDTH + 62)) - 62;
+      const h = 14 + (x % 36);
+      ctx.fillRect(offset, FLOOR - h, 58, h);
+      ctx.fillRect(offset + 7, FLOOR - h - 7, 42, 8);
+      ctx.fillRect(offset + 17, FLOOR - h - 15, 23, 8);
     }
     ctx.fillStyle = '#f37db8';
     for (let x = 0; x < WIDTH; x += 31) {
-      const offset = Math.round((x - distance * .28) % WIDTH);
-      ctx.fillRect(offset, 44 + x % 52, 3, 3);
+      const offset = Math.round(wrap(x - distance * .28, WIDTH));
+      ctx.fillRect(offset, 54 + x % 62, 3, 3);
     }
     ctx.fillStyle = '#3c1734';
     ctx.fillRect(0, FLOOR, WIDTH, 4);
@@ -78,12 +139,7 @@ export function initOffline() {
       ctx.fillRect(x + 3, FLOOR - obstacle.height - 25, 14, 6);
     }
 
-    const colors = ['', '#281522', '#fdf0fa', '#74224c', '#ffffff', '#dd4d9b'];
-    mascot.forEach((line, row) => [...line].forEach((pixel, column) => {
-      if (pixel === '0') return;
-      ctx.fillStyle = colors[pixel];
-      ctx.fillRect(RUNNER_X + column, Math.round(y) + row + 5, 1, 1);
-    }));
+    drawMascot();
   }
 
   function updateScore() {
@@ -98,28 +154,48 @@ export function initOffline() {
     play.textContent = next === 'paused' ? 'Continuar' : next === 'over' ? 'Jogar de novo' : 'Jogar';
   }
 
+  function animateImpact(now) {
+    impact = Math.min(1, (now - impactStart) / (IMPACT_DURATION * 1000));
+    draw();
+    if (impact < 1) frame = requestAnimationFrame(animateImpact);
+    else state = 'over';
+  }
+
+  function finish(now) {
+    if (score > record) {
+      record = score;
+      try { localStorage.setItem(RECORD_KEY, String(record)); } catch { /* Record stays in memory. */ }
+    }
+    updateScore();
+    stop('over', 'Fim de jogo. Você fez ' + score + ' pontos.');
+    if (reducedMotion.matches) {
+      impact = 1;
+      draw();
+      return;
+    }
+    state = 'impact';
+    impactStart = now;
+    impact = 0;
+    draw();
+    frame = requestAnimationFrame(animateImpact);
+  }
+
   function tick(now) {
     const dt = Math.min((now - last) / 1000, .032);
     last = now;
-    const speed = 176 + Math.min(distance / 17, 105);
+    const speed = 186 + Math.min(distance / 19, 104);
     distance += speed * dt;
     velocity += 730 * dt;
     y = Math.min(FLOOR - SIZE, y + velocity * dt);
     if (y === FLOOR - SIZE) velocity = 0;
     obstacle.x -= speed * dt;
 
-    const overlaps = obstacle.x < RUNNER_X + 20 && obstacle.x + 20 > RUNNER_X + 3;
-    if (overlaps && y + SIZE - 3 > FLOOR - obstacle.height) {
-      if (score > record) {
-        record = score;
-        try { localStorage.setItem(RECORD_KEY, String(record)); } catch { /* Record stays in memory. */ }
-      }
-      updateScore();
-      stop('over', 'Fim de jogo. Você fez ' + score + ' pontos.');
-      draw();
+    const overlaps = obstacle.x < RUNNER_X + 36 && obstacle.x + 20 > RUNNER_X + 6;
+    if (overlaps && y + SIZE - 4 > FLOOR - obstacle.height - 4) {
+      finish(now);
       return;
     }
-    if (signal && overlaps && Math.abs(y + 12 - (FLOOR - obstacle.height - 22)) < 13) {
+    if (signal && overlaps && Math.abs(y + SIZE / 2 - (FLOOR - obstacle.height - 22)) < 17) {
       score += 3;
       signal = false;
       updateScore();
@@ -135,7 +211,9 @@ export function initOffline() {
   }
 
   function start() {
+    cancelAnimationFrame(frame);
     if (state !== 'paused') {
+      impact = 0;
       score = 0;
       distance = 0;
       y = FLOOR - SIZE;
@@ -153,7 +231,7 @@ export function initOffline() {
 
   function jump() {
     if (state !== 'running') start();
-    if (y === FLOOR - SIZE) velocity = -315;
+    if (y === FLOOR - SIZE) velocity = -330;
   }
 
   play.addEventListener('click', () => {
@@ -180,14 +258,24 @@ export function initOffline() {
     if (state === 'running' && event.relatedTarget !== play) stop('paused', 'Jogo pausado.');
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && state === 'running') stop('paused', 'Jogo pausado.');
+    if (!document.hidden) return;
+    if (state === 'running') stop('paused', 'Jogo pausado.');
+    if (state === 'impact') endImpact();
   });
   updateScore();
   draw();
 
+  function endImpact() {
+    cancelAnimationFrame(frame);
+    state = 'over';
+    impact = 1;
+    draw();
+  }
+
   return (failure) => {
     panel.hidden = !failure;
     if (!failure && state === 'running') stop('paused', 'Jogo pausado.');
+    if (!failure && state === 'impact') endImpact();
     if (failure) document.getElementById('offline-heading').textContent =
       failure === 'offline' ? 'Sem conexão' : 'Não foi possível abrir a página';
   };

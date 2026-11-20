@@ -42,6 +42,14 @@
       <ul id="tab-list"></ul>
       <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
       <button id="reopen-tab" type="button" disabled>Reabrir última aba</button>
+      <div id="tab-preview" class="tab-preview" role="tooltip" hidden>
+        <img id="tab-preview-image" alt="" hidden>
+        <div class="tab-preview-content">
+          <strong id="tab-preview-title"></strong>
+          <span id="tab-preview-host"></span>
+          <p id="tab-preview-description" hidden></p>
+        </div>
+      </div>
       <div id="sidebar-divider" role="separator" aria-label="Largura da barra de abas" aria-orientation="vertical" aria-controls="tab-sidebar" tabindex="0"></div>
     </aside>
     <div id="site-stage" class="site-stage">
@@ -128,7 +136,7 @@
               <h2>Sinal de Volta</h2>
               <p>Pontos <output id="offline-score">0</output> · Recorde <output id="offline-record">0</output></p>
             </div>
-            <canvas id="offline-game" width="540" height="184" tabindex="0" aria-label="Sinal de Volta" aria-describedby="offline-controls"></canvas>
+            <canvas id="offline-game" width="576" height="224" tabindex="0" aria-label="Sinal de Volta" aria-describedby="offline-controls"></canvas>
             <div class="arcade-controls">
               <button id="offline-play" type="button">Jogar</button>
               <p id="offline-controls">Use Espaço, ↑ ou toque no jogo para saltar.</p>
