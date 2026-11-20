@@ -86,7 +86,12 @@
               <button type="submit" aria-label="Pesquisar" title="Pesquisar" data-static-icon="forward"></button>
             </form>
             <nav class="favorites" aria-label="Favoritos">
-              <p>Favoritos</p>
+              <div class="collection-heading">
+                <p>Favoritos</p>
+                <button id="bookmarks-import" type="button">Importar HTML</button>
+              </div>
+              <input id="bookmarks-file" type="file" accept=".html,.htm,text/html" hidden>
+              <p id="bookmarks-status" class="collection-status" role="status"></p>
               <div id="favorites-list"></div>
               <span id="favorites-empty" hidden>Use a estrela da barra para guardar uma página.</span>
             </nav>
@@ -100,14 +105,28 @@
                 <p id="widget-date"></p>
               </section>
               <section class="home-card notes-card" aria-labelledby="notes-title">
-                <h2 id="notes-title"><label for="widget-notes">Bloco de notas</label></h2>
-                <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-status"></textarea>
+                <h2 id="notes-title"><label for="widget-notes">Notas do espaço</label></h2>
+                <p id="notes-workspace"></p>
+                <textarea id="widget-notes" rows="5" maxlength="4000" placeholder="Escreva uma nota…" aria-describedby="notes-workspace notes-status"></textarea>
                 <p id="notes-status" role="status">Salvo neste dispositivo</p>
               </section>
             </div>
           </section>
           <section class="home-workspace" id="home-resume" role="tabpanel" aria-labelledby="home-resume-tab" tabindex="0" hidden>
             <h1>Retomar</h1>
+            <section class="home-card project-card" aria-labelledby="projects-title">
+              <div class="collection-heading">
+                <h2 id="projects-title">Sessões salvas</h2>
+                <div class="project-actions">
+                  <button id="project-import" type="button">Importar sessão</button>
+                  <button id="project-save" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
+                </div>
+              </div>
+              <input id="project-import-file" type="file" accept=".json,application/json" hidden>
+              <p id="projects-empty">Salve as abas e notas do espaço atual para reabrir em um novo espaço.</p>
+              <p id="project-status" class="collection-status" role="status"></p>
+              <ul id="projects-list"></ul>
+            </section>
             <div class="widget-grid">
               <section class="home-card" aria-labelledby="open-tabs-title">
                 <h2 id="open-tabs-title">Abas abertas</h2>
@@ -209,8 +228,22 @@
         <button type="submit">Mover</button>
       </div>
     </form>
+    <button id="workspace-save-project" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
     <button id="workspace-remove" type="button" aria-describedby="workspace-remove-hint">Excluir espaço atual</button>
-    <p id="workspace-remove-hint" hidden>Feche ou mova as abas para excluir este espaço.</p>
+    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem abas abertas e sem notas.</p>
+  </dialog>
+  <dialog id="project-save-dialog" aria-labelledby="project-save-title">
+    <h2 id="project-save-title">Salvar sessão</h2>
+    <p>Guarda uma cópia das abas, dos fixados e das notas do espaço atual.</p>
+    <form id="project-save-form" class="workspace-form">
+      <label for="project-name">Nome da sessão</label>
+      <div class="workspace-fields">
+        <input id="project-name" maxlength="40" required autofocus autocomplete="off">
+        <button type="submit">Salvar</button>
+      </div>
+      <p id="project-save-status" class="collection-status" role="status"></p>
+    </form>
+    <button type="button" data-dismiss>Cancelar</button>
   </dialog>
   <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
     <h2 id="downloads-heading">Downloads</h2>

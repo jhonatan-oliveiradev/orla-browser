@@ -1,4 +1,4 @@
-const kinds = { tab: 'Alternar para aba', favorite: 'Favorito', history: 'Histórico' };
+const kinds = { tab: 'Aba aberta', workspace: 'Espaço de trabalho', favorite: 'Favorito', history: 'Histórico' };
 
 export function initOmnibox({ input, list, search, onSelect, onLayout }) {
   let results = [];
@@ -41,7 +41,7 @@ export function initOmnibox({ input, list, search, onSelect, onLayout }) {
       const title = document.createElement('strong');
       title.textContent = result.title;
       const url = document.createElement('span');
-      url.textContent = result.url;
+      url.textContent = result.workspace && result.url ? result.workspace + ' · ' + result.url : result.url;
       const kind = document.createElement('small');
       kind.textContent = kinds[result.kind];
       option.append(title, url, kind);

@@ -54,25 +54,40 @@ function readableAddress(url) {
   }
 }
 
-export function suggestPages(query, { tabs, favorites, history, activeId }) {
+export function suggestPages(query, { tabs, favorites, history, activeId, workspaces = new Map(), activeWorkspaceId }) {
   const term = normalize(query.trim());
   if (!term) return [];
   const matches = new Map();
   const openTabs = new Map();
   for (const [id, tab] of tabs) {
-    if (id !== activeId && tab.url && !openTabs.has(tab.url)) openTabs.set(tab.url, { id, tab });
+    if (id === activeId || !tab.url) continue;
+    const workspace = workspaces.get(tab.workspaceId)?.name;
+    const existing = openTabs.get(tab.url);
+    if (!existing || tab.workspaceId === activeWorkspaceId) openTabs.set(tab.url, { id, tab, workspace });
+    if (!matchesPage(term, tab.url, [tab.title, workspace].filter(Boolean).join(' '))) continue;
+    const title = pageTitle(tab.title) || new URL(tab.url).hostname;
+    const startsWithTerm = [title, new URL(tab.url).hostname].some((value) => normalize(value).startsWith(term));
+    const key = 'tab:' + (tab.workspaceId ?? '') + ':' + tab.url;
+    if (!matches.has(key)) matches.set(key, { url: tab.url, title, kind: 'tab', id, workspace, startsWithTerm });
+  }
+
+  for (const [id, { name }] of workspaces) {
+    if (id === activeWorkspaceId || !matchesPage(term, '', name)) continue;
+    matches.set('workspace:' + id, { url: '', title: name, id, kind: 'workspace', startsWithTerm: normalize(name).startsWith(term) });
   }
 
   function add(url, title, kind) {
-    if (!url || matches.has(url) || !matchesPage(term, url, title)) return;
+    if (!url || !matchesPage(term, url, title)) return;
     const host = new URL(url).hostname;
     const label = pageTitle(title);
     const startsWithTerm = [host, label].some((value) => normalize(value).startsWith(term));
     const open = openTabs.get(url);
-    matches.set(url, { url, title: label || host, kind: open ? 'tab' : kind, id: open?.id, startsWithTerm });
+    const key = open ? 'tab:' + (open.tab.workspaceId ?? '') + ':' + url : url;
+    if (!matches.has(key)) matches.set(key, {
+      url, title: label || host, kind: open ? 'tab' : kind, id: open?.id, workspace: open?.workspace, startsWithTerm,
+    });
   }
 
-  for (const [url, { tab }] of openTabs) add(url, tab.title, 'tab');
   for (const [url, title] of favorites) add(url, title, 'favorite');
   for (const { url, title } of history) add(url, title, 'history');
 

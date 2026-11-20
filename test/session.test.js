@@ -115,3 +115,22 @@ test('repairs invalid or duplicate workspace records without losing earlier vali
     id: 2, name: 'Espaço de trabalho', tabs: [''], activeIndex: 0, pinnedIndices: new Set(), queries: [''],
   }]);
 });
+
+test('migrates the old note into the original workspace only until it has an explicit note', () => {
+  const base = { workspaces: [{ id: 0, name: 'Principal' }, { id: 3, name: 'Projeto' }], activeWorkspaceId: 3 };
+  assert.deepEqual([...readSession(JSON.stringify(base), 'Nota antiga').notes], [[0, 'Nota antiga'], [3, '']]);
+  base.workspaces[0].notes = '';
+  assert.deepEqual([...readSession(JSON.stringify(base), 'Nota antiga').notes], [[0, ''], [3, '']]);
+});
+
+test('restores valid saved projects, preserving tab selection, queries, pins and notes', () => {
+  const projects = [
+    { name: ' Revisão ', savedAt: 10, notes: 'Rascunho', tabs: ['https://example.org', ''], queries: ['ignorar', 'consulta'], activeIndex: 1, pinnedIndices: [0, 1] },
+    { name: 'Inválido', savedAt: 10, tabs: ['javascript:alert(1)', 'https://tauri.localhost/'] },
+    null,
+  ];
+  assert.deepEqual(readSession(JSON.stringify({ projects })).projects, [{
+    name: 'Revisão', savedAt: 10, notes: 'Rascunho', tabs: ['https://example.org/', ''],
+    queries: ['', 'consulta'], activeIndex: 1, pinnedIndices: [0],
+  }]);
+});

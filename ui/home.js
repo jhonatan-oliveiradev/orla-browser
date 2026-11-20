@@ -1,30 +1,12 @@
-const NOTE_KEY = 'orla.home.note.v1';
 const timeFormat = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
 
 export function initHome(refreshResume) {
   const tabList = document.querySelector('.home-nav');
   const tabs = [...tabList.querySelectorAll('[role="tab"]')];
-  const notes = document.getElementById('widget-notes');
-  const noteStatus = document.getElementById('notes-status');
   const clock = document.getElementById('widget-clock');
   const dateLabel = document.getElementById('widget-date');
   let timer;
-
-  try {
-    notes.value = localStorage.getItem(NOTE_KEY) ?? '';
-  } catch {
-    noteStatus.textContent = 'Não foi possível ler a nota deste dispositivo.';
-  }
-  notes.addEventListener('input', () => {
-    try {
-      if (notes.value) localStorage.setItem(NOTE_KEY, notes.value);
-      else localStorage.removeItem(NOTE_KEY);
-      noteStatus.textContent = 'Salvo neste dispositivo';
-    } catch {
-      noteStatus.textContent = 'Não foi possível salvar a nota.';
-    }
-  });
 
   function updateClock() {
     const now = new Date();

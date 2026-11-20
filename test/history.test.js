@@ -41,3 +41,19 @@ test('separates browser queries from URLs and accepts explicit SearXNG origins',
     assert.throws(() => providerAddress(invalid), /HTTPS/);
   }
 });
+
+test('finds workspaces and preserves separate tabs with the same address in different workspaces', () => {
+  const url = 'https://example.org/review';
+  const options = {
+    tabs: new Map([[11, { url, title: 'Review', workspaceId: 1 }], [22, { url, title: 'Review', workspaceId: 2 }]]),
+    workspaces: new Map([[1, { name: 'Pessoal' }], [2, { name: 'Estúdio NX' }]]),
+    activeWorkspaceId: 1, activeId: 99, favorites: new Map([[url, 'Review']]), history: [],
+  };
+  assert.deepEqual(suggestPages('review', options).map(({ kind, id, workspace }) => [kind, id, workspace]), [
+    ['tab', 11, 'Pessoal'], ['tab', 22, 'Estúdio NX'],
+  ]);
+  assert.deepEqual(suggestPages('estudio', options).map(({ kind, id }) => [kind, id]), [
+    ['workspace', 2], ['tab', 22],
+  ]);
+  assert.deepEqual(suggestPages('estudio review', options).map(({ kind, id }) => [kind, id]), [['tab', 22]]);
+});
