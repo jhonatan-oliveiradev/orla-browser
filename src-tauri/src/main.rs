@@ -240,9 +240,11 @@ mod find {
 #[cfg(all(windows, debug_assertions, feature = "windows-smoke"))]
 mod smoke;
 
-macro_rules! commands {
-    ($($extra:tt)*) => {
-        tauri::generate_handler![
+fn main() {
+    let app = tauri::Builder::default();
+    #[cfg(all(windows, debug_assertions, feature = "windows-smoke"))]
+    let app = app.setup(smoke::setup);
+    app.invoke_handler(tauri::generate_handler![
             navigate_tab,
             show_tab,
             resize_tabs,
@@ -255,17 +257,7 @@ macro_rules! commands {
             site_events::download_history,
             site_events::tab_preview,
             search::search_web,
-            $($extra)*
-        ]
-    };
-}
-
-fn main() {
-    let app = tauri::Builder::default();
-    #[cfg(all(windows, debug_assertions, feature = "windows-smoke"))]
-    let app = app.on_page_load(smoke::on_page_load).invoke_handler(commands![smoke::smoke_reply]);
-    #[cfg(not(all(windows, debug_assertions, feature = "windows-smoke")))]
-    let app = app.invoke_handler(commands![]);
-    app.run(tauri::generate_context!())
+        ])
+        .run(tauri::generate_context!())
         .expect("Não foi possível iniciar o Orla Browser");
 }

@@ -69,14 +69,7 @@ jobs:
           } finally {
             if (!$app.HasExited) { Stop-Process -Id $app.Id }
           }
-      - name: Exercise native WebView2 flows
-        if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'windows-preview'))
-        run: |
-          cargo build --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --features windows-smoke,tauri/custom-protocol
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/smoke-windows.mjs src-tauri/target/x86_64-pc-windows-msvc/debug/orla-browser.exe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload verified installer
+      - name: Upload preview installer
         if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'windows-preview'))
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -84,3 +77,10 @@ jobs:
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 7
+      - name: Exercise native WebView2 flows
+        if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'windows-preview'))
+        run: |
+          cargo build --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --features windows-smoke,tauri/custom-protocol
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/smoke-windows.mjs src-tauri/target/x86_64-pc-windows-msvc/debug/orla-browser.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

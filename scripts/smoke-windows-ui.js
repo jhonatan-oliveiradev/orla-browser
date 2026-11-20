@@ -83,8 +83,8 @@
       await until('O download não foi concluído.', () => contains('#downloads-list', 'Concluído'));
     }
     if (get('#widget-notes').value !== 'Nota de teste do Orla') throw new Error('A nota do espaço ficou indisponível.');
-    await window.__TAURI__.core.invoke('smoke_reply', { message: 'ok' });
+    window.orlaSmokeResult = 'ok';
   } catch (error) {
-    await window.__TAURI__.core.invoke('smoke_reply', { message: String(error.stack ?? error) });
+    window.orlaSmokeResult = String(error.stack ?? error);
   }
 })();
