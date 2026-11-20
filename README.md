@@ -25,8 +25,9 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 
 - Nova aba com favoritos de início e interface baseada no [Figma V3](https://www.figma.com/design/z0VTjnV3KAlis2UDNxif9b?node-id=15-29).
 - A nova aba oferece **Início**, **Widgets** (hora local e nota salva neste dispositivo) e **Retomar** (páginas abertas e páginas fechadas na sessão atual).
-- O botão **Tema** troca a aparência entre Lima, Lavanda e Areia. O grafismo da Nova Aba pode ficar estático por preferência do sistema ou pelo controle de animação nesse menu. A escolha é salva no dispositivo.
+- O botão **Aparência** troca a aparência entre Lima, Lavanda e Areia. O grafismo da Nova Aba pode ficar estático por preferência do sistema ou pelo controle de animação nesse menu. A escolha é salva no dispositivo.
 - Arraste o espaço livre da barra superior para mover a janela. Use as bordas e os cantos para redimensionar.
+- As ações de fixar abas, favoritar páginas, recolher a lateral, maximizar a janela e controlar o jogo usam ícones animados com Morphicons. Com movimento reduzido, o estado muda imediatamente.
 - As abas ficam na lateral. Arraste o divisor ou use as setas do teclado para mudar a largura. O botão na barra de ferramentas recolhe a lateral para mostrar apenas a aba atual. A largura, o estado recolhido e as abas fixadas são restaurados quando você reabre o Orla.
 - Navegação HTTP(S) em webviews nativas e controles de histórico por aba. O Orla salva localmente os endereços e a aba selecionada. Ao reiniciar, carrega a aba selecionada e deixa as demais aguardando seleção. O histórico de voltar e avançar recomeça com cada nova execução.
 - O painel de abas permite buscar entre as abertas e reabrir a última aba fechada na execução atual. A estrela na barra adiciona ou remove páginas dos favoritos da nova aba.
@@ -37,4 +38,4 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - O painel Agente é apenas informativo. A interface local tem permissões próprias e os webviews de sites não recebem acesso aos comandos do aplicativo.
 - Links HTTP(S) que pedem uma nova janela em resposta a uma ação do usuário abrem uma aba. Pop-ups automáticos continuam bloqueados. A lista de downloads da sessão permite acompanhar, cancelar e localizar arquivos concluídos.
 - Quando a navegação falhar, a aba mostra **Tentar novamente** e o jogo offline **Sinal de Volta**. Use Espaço, seta para cima ou toque para saltar e coletar sinais. O recorde fica no dispositivo.
-- Em **Tema → Provedor de busca** você pode testar uma instância SearXNG antes de salvá-la. O teste envia a consulta padrão `Orla`.
+- Em **Aparência → Provedor de busca** você pode testar uma instância SearXNG antes de salvá-la. O teste envia a consulta padrão `Orla`.

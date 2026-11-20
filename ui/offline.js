@@ -1,3 +1,5 @@
+import { setIcon } from './icons.js';
+
 const WIDTH = 576;
 const HEIGHT = 224;
 const FLOOR = 186;
@@ -26,6 +28,8 @@ export function initOffline() {
   const panel = document.getElementById('offline-view');
   const canvas = document.getElementById('offline-game');
   const play = document.getElementById('offline-play');
+  const playLabel = document.getElementById('offline-play-label');
+  setIcon(play, 'play');
   const scoreLabel = document.getElementById('offline-score');
   const recordLabel = document.getElementById('offline-record');
   const message = document.getElementById('offline-message');
@@ -151,7 +155,8 @@ export function initOffline() {
     cancelAnimationFrame(frame);
     state = next;
     message.textContent = announcement;
-    play.textContent = next === 'paused' ? 'Continuar' : next === 'over' ? 'Jogar de novo' : 'Jogar';
+    playLabel.textContent = next === 'paused' ? 'Continuar' : next === 'over' ? 'Jogar de novo' : 'Jogar';
+    setIcon(play, next === 'over' ? 'reopen' : 'play', true);
   }
 
   function animateImpact(now) {
@@ -223,7 +228,8 @@ export function initOffline() {
       updateScore();
     }
     message.textContent = '';
-    play.textContent = 'Pausar';
+    playLabel.textContent = 'Pausar';
+    setIcon(play, 'pause', true);
     state = 'running';
     last = performance.now();
     frame = requestAnimationFrame(tick);
