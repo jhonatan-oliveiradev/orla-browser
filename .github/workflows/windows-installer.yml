@@ -3,6 +3,8 @@ name: Windows validation
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [ci/orla-installer-112e0de]
   workflow_dispatch:
 
 permissions:
@@ -36,10 +38,10 @@ jobs:
         if: github.event_name == 'pull_request'
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
       - name: Build installer
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: npm run build:installer
       - name: Install and launch Orla
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $bundleDir = 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis'
@@ -74,7 +76,7 @@ jobs:
             if (!$app.HasExited) { Stop-Process -Id $app.Id }
           }
       - name: Upload verified installer
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: orla-browser-windows-x64
