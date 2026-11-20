@@ -656,3 +656,25 @@ dialog :is(input, select, button):focus-visible, #find-bar :is(input, button):fo
 #devtools-rules section { padding: 6px 8px; border-bottom: 1px solid var(--chrome-line); }
 #devtools-rules h3 { margin: 0 0 4px; color: var(--inspect-tag); overflow-wrap: anywhere; font: inherit; }
 #devtools-rules pre { margin: 0; padding-inline-start: 9px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--inspect-attribute); }
+
+#tab-list li { position: relative; }
+#tab-list li[data-dragging] { opacity: .48; }
+#tab-list li[data-drop-edge]::after {
+  position: absolute;
+  inset-inline: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  content: "";
+}
+#tab-list li[data-drop-edge="before"]::after { top: -2px; }
+#tab-list li[data-drop-edge="after"]::after { bottom: -2px; }
+#tab-list .tab-actions button[aria-haspopup] { width: 22px; }
+#tab-dialog { width: 335px; }
+.tab-dialog-title { overflow-wrap: anywhere; }
+.tab-dialog-actions { display: grid; gap: 3px; margin-bottom: 10px; }
+.tab-dialog-actions button { display: flex; gap: 8px; align-items: center; justify-content: space-between; text-align: start; }
+.tab-dialog-actions kbd { color: var(--muted); }
+#tab-menu-move-form[hidden] { display: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }

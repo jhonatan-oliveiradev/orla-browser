@@ -56,3 +56,8 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - **Console** filtra texto e nível. Use as setas para percorrer as expressões enviadas na aba em inspeção. **Rede** mostra estados e permite abrir os detalhes de cada requisição, incluindo protocolo, duração e bytes quando disponíveis.
 - **Ações da página** reúne zoom, duplicação e cópia do endereço. O zoom é salvo por domínio e aceita **Ctrl++**, **Ctrl+-** e **Ctrl+0**. Use **Ctrl+Tab** e **Ctrl+Shift+Tab** para alternar abas do espaço atual.
 - **Extensões** mostra nome, versão e permissões declaradas no manifesto antes de confirmar a instalação de uma pasta local.
+
+### Organização de abas
+
+- Arraste uma aba pela barra lateral para reordená-la dentro do seu grupo. Com foco na aba, use **Alt+↑** ou **Alt+↓**. A ordem é restaurada ao reabrir o Orla.
+- Abra **Ações da aba** pelo botão ao lado dela, com o botão direito ou com **Shift+F10**. O menu permite fixar, duplicar, reordenar, mover para outro espaço ou fechar a aba. O botão do meio também fecha a aba.

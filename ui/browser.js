@@ -1,3 +1,5 @@
+import { initTabDrag } from './tab-drag.js';
+import { reorderTabs } from './tab-order.js';
 import { duckDuckGo, resolveNavigation } from './address.js';
 import { readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
@@ -444,12 +446,52 @@ function resetTabPreview(tab) {
 
 const tabRows = new Map();
 
+function canReorder(id) {
+  return !sidebarSettings.collapsed && !tabFilter.value.trim() && tabs.get(id)?.workspaceId === activeWorkspace.id;
+}
+
+function moveTabWithinSpace(source, destination, after) {
+  if (!canReorder(source) || !canReorder(destination)) return;
+  const updated = reorderTabs(orderedTabs(), source, destination, after);
+  if (!updated) return;
+  for (const [id] of updated) tabs.delete(id);
+  for (const [id, tab] of updated) tabs.set(id, tab);
+  saveSession();
+  refreshTabList();
+  if (!home.hidden && !byId('home-resume').hidden) renderResume();
+  const position = updated.findIndex(([id]) => id === source) + 1;
+  byId('tab-order-status').textContent = 'Aba movida para a posição ' + position + ' de ' + updated.length + '.';
+}
+
+function neighboringTab(id, delta) {
+  if (!canReorder(id)) return;
+  const entries = orderedTabs();
+  const position = entries.findIndex(([tabId]) => tabId === id);
+  const neighbor = entries[position + delta];
+  return neighbor?.[1].pinned === entries[position][1].pinned ? neighbor[0] : undefined;
+}
+
+function nudgeTab(id, delta) {
+  const neighbor = neighboringTab(id, delta);
+  if (neighbor !== undefined) moveTabWithinSpace(id, neighbor, delta > 0);
+}
+
+const tabDrag = initTabDrag(tabList, {
+  canDrag: canReorder,
+  canDrop: (source, destination) => source !== destination && canReorder(source) && canReorder(destination)
+    && tabs.get(source).pinned === tabs.get(destination).pinned,
+  move: (source, destination, after) => schedule(() => moveTabWithinSpace(source, destination, after)),
+  onStart: closeTabPreview,
+});
+
 function buildTabRow(id) {
   const row = document.createElement('li');
+  row.dataset.tabRow = String(id);
   const select = document.createElement('button');
   select.className = 'tab-select';
   select.dataset.tabId = String(id);
   select.dataset.focusKey = 'select-' + id;
+  select.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Shift+F10');
   const mark = document.createElement('span');
   mark.className = 'tab-mark';
   mark.setAttribute('aria-hidden', 'true');
@@ -474,10 +516,34 @@ function buildTabRow(id) {
   });
   select.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && previewTarget === select) closeTabPreview();
+    if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) {
+      event.preventDefault();
+      openTabOptions(id);
+    } else if (event.altKey && !event.ctrlKey && !event.shiftKey && !event.metaKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault();
+      schedule(() => nudgeTab(id, event.key === 'ArrowUp' ? -1 : 1));
+    }
   });
 
+  row.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openTabOptions(id);
+  });
+  select.addEventListener('auxclick', (event) => {
+    if (event.button === 1) {
+      event.preventDefault();
+      schedule(() => closeTab(id));
+    }
+  });
   const actions = document.createElement('div');
   actions.className = 'tab-actions';
+  const menu = document.createElement('button');
+  menu.className = 'icon';
+  menu.dataset.focusKey = 'menu-' + id;
+  menu.setAttribute('aria-haspopup', 'dialog');
+  menu.setAttribute('aria-controls', 'tab-dialog');
+  menu.addEventListener('click', () => openTabOptions(id));
+  setIcon(menu, 'more');
   const pin = document.createElement('button');
   pin.className = 'icon';
   pin.dataset.pin = String(id);
@@ -488,9 +554,9 @@ function buildTabRow(id) {
   close.dataset.focusKey = 'close-' + id;
   close.addEventListener('click', () => schedule(() => closeTab(id)));
   setIcon(close, 'close');
-  actions.append(pin, close);
+  actions.append(pin, menu, close);
   row.append(select, actions);
-  const parts = { row, select, mark, text, actions, pin, close };
+  const parts = { row, select, mark, text, actions, pin, menu, close };
   tabRows.set(id, parts);
   return parts;
 }
@@ -531,11 +597,14 @@ function refreshTabList(animatedPinId) {
     if (sidebarSettings.collapsed && id !== activeWorkspace.activeId) continue;
     const title = tab.url ? tab.title || new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba';
     if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter) && !tab.url.toLowerCase().includes(filter)) continue;
-    const { row, select, mark, text, actions, pin, close } = tabRows.get(id) ?? buildTabRow(id);
+    const { row, select, mark, text, actions, pin, menu, close } = tabRows.get(id) ?? buildTabRow(id);
     visible.add(id);
     row.dataset.pinned = String(tab.pinned);
     row.dataset.active = String(id === activeWorkspace.activeId);
     select.setAttribute('aria-label', title);
+    select.draggable = canReorder(id);
+    menu.setAttribute('aria-label', 'Ações da aba ' + title);
+    menu.title = 'Ações da aba';
     if (id === activeWorkspace.activeId) select.setAttribute('aria-current', 'true');
     else select.removeAttribute('aria-current');
     if (!tab.url || sidebarSettings.collapsed) select.title = title;
@@ -572,6 +641,7 @@ function createTab(url = '', pinned = false, workspace = activeWorkspace) {
   const id = nextId++;
   tabs.set(id, { workspaceId: workspace.id, url, loaded: false, pinned, title: knownTitles.get(url) || '' });
   if (workspace === activeWorkspace) workspace.activeId = id;
+  return id;
 }
 
 function detachActiveWorkspaceTab(id) {
@@ -673,6 +743,73 @@ function workspaceOptions() {
   return [...workspaces.values()].map(({ id, name }) => ({ id, name, count: counts.get(id) || 0 }));
 }
 
+function moveTabToWorkspace(tabId, workspaceId) {
+  const target = workspaces.get(workspaceId);
+  const tab = tabs.get(tabId);
+  if (!target || target === activeWorkspace || tab?.workspaceId !== activeWorkspace.id || !hasContent(tab)) return false;
+  detachActiveWorkspaceTab(tabId);
+  const targetEntries = workspaceTabs(target);
+  if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
+    tabs.delete(targetEntries[0][0]);
+    target.activeId = tabId;
+  }
+  tab.workspaceId = target.id;
+  tabs.set(tabId, tab);
+  saveSession();
+  byId('tab-order-status').textContent = 'Aba movida para ' + target.name + '.';
+  return true;
+}
+
+const tabDialog = byId('tab-dialog');
+let optionsTabId;
+
+function openTabOptions(id) {
+  const tab = tabs.get(id);
+  if (tab?.workspaceId !== activeWorkspace.id || document.querySelector('dialog[open]')) return;
+  closeTabPreview();
+  optionsTabId = id;
+  byId('tab-dialog-title').textContent = tabRows.get(id).select.getAttribute('aria-label');
+  byId('tab-menu-pin').disabled = !tab.url;
+  byId('tab-menu-pin').textContent = tab.pinned ? 'Desafixar aba' : 'Fixar aba';
+  byId('tab-menu-up').disabled = neighboringTab(id, -1) === undefined;
+  byId('tab-menu-down').disabled = neighboringTab(id, 1) === undefined;
+  const targets = [...workspaces.values()].filter((workspace) => workspace !== activeWorkspace);
+  const field = byId('tab-menu-space');
+  field.replaceChildren(...targets.map(({ id, name }) => new Option(name, id)));
+  byId('tab-menu-move-form').hidden = !targets.length || !hasContent(tab);
+  openDialog(tabDialog);
+}
+
+function tabOption(action) {
+  const id = optionsTabId;
+  if (!tabDialog.open) return;
+  tabDialog.close();
+  schedule(() => {
+    const tab = tabs.get(id);
+    if (tab?.workspaceId === activeWorkspace.id) return action(id, tab);
+  });
+}
+
+byId('tab-menu-pin').addEventListener('click', () => tabOption(togglePin));
+byId('tab-menu-up').addEventListener('click', () => tabOption((id) => nudgeTab(id, -1)));
+byId('tab-menu-down').addEventListener('click', () => tabOption((id) => nudgeTab(id, 1)));
+byId('tab-menu-close').addEventListener('click', () => tabOption(closeTab));
+byId('tab-menu-duplicate').addEventListener('click', () => tabOption(async (_, tab) => {
+  if (!tab.webSearch) return openTab(tab.url);
+  const id = createTab();
+  tabs.get(id).webSearch = searchState(tab.webSearch.query, 'Pesquise novamente para atualizar os resultados.');
+  showCurrentAddress();
+  saveSession();
+  await syncView();
+}));
+byId('tab-menu-move-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const target = Number(byId('tab-menu-space').value);
+  tabOption((id) => {
+    if (moveTabToWorkspace(id, target)) return syncView();
+  });
+});
+
 const workspaceControls = initWorkspaces({
   open: openDialog,
   getState: () => ({
@@ -693,20 +830,7 @@ const workspaceControls = initWorkspaces({
     workspaceControls.renderDialog();
   }),
   move: (id) => schedule(() => {
-    const target = workspaces.get(id);
-    const tabId = activeWorkspace.activeId;
-    const tab = tabs.get(tabId);
-    if (!target || target === activeWorkspace || !hasContent(tab)) return;
-    detachActiveWorkspaceTab(tabId);
-    const targetEntries = workspaceTabs(target);
-    if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
-      tabs.delete(targetEntries[0][0]);
-      target.activeId = tabId;
-    }
-    tab.workspaceId = target.id;
-    tabs.set(tabId, tab);
-    saveSession();
-    workspaceControls.close();
+    if (moveTabToWorkspace(activeWorkspace.activeId, id)) workspaceControls.close();
   }),
   remove: () => schedule(() => {
     const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
@@ -724,6 +848,7 @@ function switchWorkspace(workspace, tabId = workspace.activeId) {
   activeWorkspace = workspace;
   workspace.activeId = tabId;
   tabFilter.value = '';
+  tabDrag.end();
   showCurrentAddress();
   saveSession();
   workspaceControls.close();
@@ -796,7 +921,7 @@ for (const button of [byId('new-tab'), byId('add-tab')]) {
   button.addEventListener('click', () => schedule(() => openTab()));
 }
 reopenButton.addEventListener('click', () => schedule(reopenTab));
-tabFilter.addEventListener('input', refreshTabList);
+tabFilter.addEventListener('input', () => { tabDrag.end(); refreshTabList(); });
 favoriteButton.addEventListener('click', () => {
   const url = tabs.get(activeWorkspace.activeId).url;
   if (!url) return;

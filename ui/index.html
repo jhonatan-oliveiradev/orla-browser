@@ -52,7 +52,8 @@
         <span data-static-icon="search" aria-hidden="true"></span>
         <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off">
       </div>
-      <ul id="tab-list"></ul>
+      <ul id="tab-list" aria-label="Abas do espaço atual"></ul>
+      <p id="tab-order-status" class="visually-hidden" role="status"></p>
       <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
       <button id="reopen-tab" type="button" data-static-icon="reopen" title="Reabrir última aba (Ctrl+Shift+T)" disabled>Reabrir última aba</button>
       <div id="tab-preview" class="tab-preview" role="tooltip" hidden>
@@ -385,6 +386,27 @@
     <label class="setting-row"><span>Painéis opacos</span><input id="appearance-solid" type="checkbox"></label>
     <label class="setting-row"><span>Animar fundo da Nova Aba</span><input id="appearance-motion" type="checkbox" checked></label>
     <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
+  </dialog>
+  <dialog id="tab-dialog" aria-labelledby="tab-dialog-heading" aria-describedby="tab-dialog-title">
+    <header class="dialog-heading">
+      <h2 id="tab-dialog-heading">Ações da aba</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar ações da aba" data-static-icon="close"></button>
+    </header>
+    <p id="tab-dialog-title" class="tab-dialog-title"></p>
+    <div class="tab-dialog-actions">
+      <button type="button" id="tab-menu-pin">Fixar aba</button>
+      <button type="button" id="tab-menu-duplicate">Duplicar aba</button>
+      <button type="button" id="tab-menu-up">Mover para cima <kbd>Alt+↑</kbd></button>
+      <button type="button" id="tab-menu-down">Mover para baixo <kbd>Alt+↓</kbd></button>
+      <button type="button" id="tab-menu-close">Fechar aba</button>
+    </div>
+    <form id="tab-menu-move-form" class="workspace-form" hidden>
+      <label for="tab-menu-space">Mover para outro espaço</label>
+      <div class="workspace-fields">
+        <select id="tab-menu-space"></select>
+        <button class="primary" type="submit">Mover</button>
+      </div>
+    </form>
   </dialog>
   <dialog id="page-dialog" aria-labelledby="page-heading">
     <header class="dialog-heading">
