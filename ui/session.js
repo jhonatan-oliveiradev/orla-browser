@@ -2,6 +2,7 @@ import { readAppearance } from './appearance.js';
 import { sidebarWidth } from './sidebar.js';
 
 export const SESSION_KEY = 'orla.session.v1';
+export const SESSION_BACKUP_KEY = 'orla.session.backup.v1';
 export const LEGACY_NOTE_KEY = 'orla.home.note.v1';
 
 const initialFavorites = [
@@ -59,13 +60,30 @@ export function readSavedProject(value) {
   return { name, savedAt: value.savedAt, notes: workspaceNotes(value.notes), ...group, pinnedIndices: [...group.pinnedIndices] };
 }
 
-export function readSession(serialized, legacyNote) {
-  let saved;
+function parseSnapshot(serialized) {
   try {
-    saved = JSON.parse(serialized);
+    const value = JSON.parse(serialized);
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
   } catch {
-    // An unreadable snapshot starts a fresh session.
+    // Try the previous snapshot if available.
   }
+  return null;
+}
+
+export function saveSnapshot(storage, value) {
+  const previous = storage.getItem(SESSION_KEY);
+  const next = JSON.stringify(value);
+  if (previous === next) return;
+  if (parseSnapshot(previous)) {
+    try { storage.setItem(SESSION_BACKUP_KEY, previous); } catch { /* The current snapshot can still be saved. */ }
+  }
+  storage.setItem(SESSION_KEY, next);
+}
+
+export function readSession(serialized, legacyNote, backup) {
+  const primary = parseSnapshot(serialized);
+  const recovered = primary ? null : parseSnapshot(backup);
+  const saved = primary || recovered;
 
   const workspaces = [];
   const entriesById = new Map();
@@ -78,6 +96,12 @@ export function readSession(serialized, legacyNote) {
       entriesById.set(id, entry);
       workspaces.push({
         id, name: workspaceName(entry.name) || 'Espaço de trabalho',
+        ...(Array.isArray(entry.recentlyClosed) ? {
+          recentlyClosed: entry.recentlyClosed.slice(-20).flatMap((item) => {
+            const url = websiteAddress(item?.url);
+            return url ? [{ url, pinned: item.pinned === true, title: typeof item.title === 'string' ? item.title.slice(0, 160) : '' }] : [];
+          }),
+        } : {}),
         ...readTabGroup(entry),
       });
     }
@@ -104,5 +128,5 @@ export function readSession(serialized, legacyNote) {
   };
   const appearance = readAppearance(saved?.appearance);
   const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
-  return { workspaces, activeWorkspaceId, notes, projects, favorites, sidebar, appearance, searchProvider };
+  return { workspaces, activeWorkspaceId, notes, projects, favorites, sidebar, appearance, searchProvider, recovered: Boolean(recovered) };
 }

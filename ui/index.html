@@ -21,11 +21,13 @@
       <kbd aria-hidden="true">Ctrl+L</kbd>
     </form>
     <div class="toolbar-tools">
+      <button id="page-options" class="icon" type="button" aria-label="Ações da página" title="Ações da página" aria-haspopup="dialog" aria-controls="page-dialog" disabled data-static-icon="more"></button>
       <button id="favorite-page" class="icon" aria-label="Favoritar página" aria-pressed="false" disabled></button>
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
       <button id="appearance" class="icon" type="button" aria-label="Aparência" title="Aparência" aria-haspopup="dialog" aria-controls="appearance-dialog" data-static-icon="appearance"></button>
       <button id="downloads-toggle" class="icon" type="button" aria-label="Downloads" title="Downloads" aria-haspopup="dialog" aria-controls="downloads-dialog" data-static-icon="download"></button>
       <button id="devtools-toggle" class="icon" type="button" aria-label="DevTools" title="DevTools (F12)" aria-expanded="false" aria-controls="devtools-panel" aria-keyshortcuts="F12 Control+Shift+I" data-static-icon="devtools"></button>
+      <button id="extensions-toggle" class="icon" type="button" aria-label="Extensões" title="Extensões" aria-haspopup="dialog" aria-controls="extensions-dialog" data-static-icon="extensions"></button>
       <button id="agent" class="icon" type="button" aria-label="Agente" title="Agente" aria-haspopup="dialog" aria-controls="agent-dialog" data-static-icon="agent"></button>
     </div>
     <div class="window-drag-space" data-tauri-drag-region aria-hidden="true"></div>
@@ -50,7 +52,8 @@
         <span data-static-icon="search" aria-hidden="true"></span>
         <input id="tab-filter" type="search" aria-label="Buscar nas abas abertas" placeholder="Buscar nas abas" autocomplete="off">
       </div>
-      <ul id="tab-list"></ul>
+      <ul id="tab-list" aria-label="Abas do espaço atual"></ul>
+      <p id="tab-order-status" class="visually-hidden" role="status"></p>
       <p id="tabs-empty" role="status" hidden>Nenhuma aba corresponde à busca.</p>
       <button id="reopen-tab" type="button" data-static-icon="reopen" title="Reabrir última aba (Ctrl+Shift+T)" disabled>Reabrir última aba</button>
       <div id="tab-preview" class="tab-preview" role="tooltip" hidden>
@@ -64,7 +67,21 @@
       <div id="sidebar-divider" role="separator" aria-label="Largura da barra de abas" aria-orientation="vertical" aria-controls="tab-sidebar" tabindex="0"></div>
     </aside>
     <div id="site-stage" class="site-stage">
-      <ul id="address-suggestions" class="address-suggestions" role="listbox" aria-label="Sugestões locais" hidden></ul>
+      <div class="stage-controls">
+        <ul id="address-suggestions" class="address-suggestions" role="listbox" aria-label="Sugestões locais" hidden></ul>
+        <div id="session-recovery" class="session-recovery" hidden>
+          <p role="status">Restauramos a última cópia disponível das suas abas e espaços.</p>
+          <button id="session-recovery-dismiss" type="button">Dispensar</button>
+        </div>
+        <form id="find-bar" role="search" aria-label="Buscar nesta página" hidden>
+          <span data-static-icon="search" aria-hidden="true"></span>
+          <input id="find-query" type="search" aria-label="Texto para localizar" placeholder="Buscar nesta página" maxlength="1024" autocomplete="off" spellcheck="false">
+          <output id="find-status" aria-live="polite"></output>
+          <button id="find-prev" class="icon" type="button" aria-label="Ocorrência anterior" title="Anterior (Shift+Enter)" data-static-icon="up"></button>
+          <button id="find-next" class="icon" type="submit" aria-label="Próxima ocorrência" title="Próxima (Enter)" data-static-icon="down"></button>
+          <button id="find-close" class="icon" type="button" aria-label="Fechar busca na página" title="Fechar (Esc)" data-static-icon="close"></button>
+        </form>
+      </div>
       <div id="site-viewport" class="site-viewport">
         <main id="home">
           <div class="home-art" aria-hidden="true">
@@ -200,6 +217,11 @@
             <button id="devtools-tab-console" type="button" role="tab" aria-selected="false" aria-controls="devtools-console" tabindex="-1" data-devtools-section="console">Console</button>
             <button id="devtools-tab-network" type="button" role="tab" aria-selected="false" aria-controls="devtools-network" tabindex="-1" data-devtools-section="network">Rede</button>
           </div>
+          <select id="devtools-position" aria-label="Posição da DevTools">
+            <option value="bottom">Embaixo</option>
+            <option value="left">À esquerda</option>
+            <option value="right">À direita</option>
+          </select>
           <button id="devtools-close" class="icon" type="button" title="Fechar DevTools" aria-label="Fechar DevTools" data-static-icon="close"></button>
         </header>
         <p id="devtools-status" role="status"></p>
@@ -212,14 +234,26 @@
           </div>
           <div class="devtools-column">
             <div class="devtools-actions">
-              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos computados" placeholder="Filtrar estilos computados">
+              <select id="devtools-style-view" aria-label="Modo de estilos">
+                <option value="computed">Computados</option>
+                <option value="rules">Regras CSS</option>
+              </select>
+              <input id="devtools-style-filter" type="search" aria-label="Filtrar estilos" placeholder="Filtrar estilos">
             </div>
             <p id="devtools-style-empty">Selecione um elemento para ver seus estilos.</p>
             <dl id="devtools-styles"></dl>
+            <div id="devtools-rules" hidden></div>
           </div>
         </section>
         <section id="devtools-console" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-console" hidden>
           <div class="devtools-actions">
+            <select id="devtools-level" aria-label="Nível das mensagens">
+              <option value="all">Todos os níveis</option>
+              <option value="error">Erros</option>
+              <option value="warning">Avisos</option>
+              <option value="info">Informações</option>
+            </select>
+            <input id="devtools-console-filter" type="search" aria-label="Filtrar mensagens do console" placeholder="Filtrar mensagens">
             <button id="devtools-clear-console" type="button">Limpar console</button>
           </div>
           <div class="devtools-scroll">
@@ -235,6 +269,7 @@
         <section id="devtools-network" class="devtools-stream" role="tabpanel" aria-labelledby="devtools-tab-network" hidden>
           <div class="devtools-actions">
             <input id="devtools-network-filter" type="search" aria-label="Filtrar requisições" placeholder="Filtrar requisições">
+            <label class="devtools-keep"><input id="devtools-keep-network" type="checkbox">Preservar log</label>
             <button id="devtools-clear-network" type="button">Limpar rede</button>
           </div>
           <div class="devtools-scroll">
@@ -244,6 +279,10 @@
               <tbody id="devtools-requests"></tbody>
             </table>
           </div>
+          <section id="devtools-request-details" aria-label="Detalhes da requisição" hidden>
+            <div class="devtools-actions"><strong>Requisição</strong><button type="button" id="devtools-request-close">Fechar detalhes</button></div>
+            <dl id="devtools-request-fields"></dl>
+          </section>
         </section>
       </section>
     </div>
@@ -305,7 +344,7 @@
   </dialog>
   <dialog id="downloads-dialog" aria-labelledby="downloads-heading">
     <h2 id="downloads-heading">Downloads</h2>
-    <p id="downloads-empty">Os arquivos baixados nesta sessão aparecem aqui.</p>
+    <p id="downloads-empty">Seus downloads aparecem aqui, inclusive após reiniciar o Orla.</p>
     <p id="downloads-error" role="status"></p>
     <ul id="downloads-list"></ul>
     <button type="button" data-dismiss>Fechar</button>
@@ -323,16 +362,92 @@
     </form>
   </dialog>
   <dialog id="appearance-dialog" aria-labelledby="appearance-heading">
-    <h2 id="appearance-heading">Aparência</h2>
+    <header class="dialog-heading">
+      <h2 id="appearance-heading">Aparência</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar aparência" data-static-icon="close"></button>
+    </header>
     <fieldset class="theme-options">
-      <legend>Tema do Orla</legend>
-      <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span> Lima</label>
-      <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span> Lavanda</label>
-      <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span> Areia</label>
+      <legend>Paleta</legend>
+      <div class="theme-grid">
+        <label><input type="radio" name="theme" value="lima" checked><span class="theme-swatch" aria-hidden="true"></span>Lima</label>
+        <label><input type="radio" name="theme" value="lavanda"><span class="theme-swatch" aria-hidden="true"></span>Lavanda</label>
+        <label><input type="radio" name="theme" value="areia"><span class="theme-swatch" aria-hidden="true"></span>Areia</label>
+        <label><input type="radio" name="theme" value="oceano"><span class="theme-swatch" aria-hidden="true"></span>Oceano</label>
+        <label><input type="radio" name="theme" value="grafite"><span class="theme-swatch" aria-hidden="true"></span>Grafite</label>
+      </div>
     </fieldset>
-    <label class="motion-option"><input id="appearance-motion" type="checkbox" checked> Animar fundo da Nova Aba</label>
-    <button id="settings-search" type="button">Provedor de busca</button>
-    <button type="button" data-dismiss>Fechar</button>
+    <div class="setting-row">
+      <label for="appearance-accent">Cor de destaque</label>
+      <input id="appearance-accent" type="color" aria-describedby="appearance-accent-hint">
+      <button id="appearance-reset-accent" type="button">Restaurar cor</button>
+    </div>
+    <p id="appearance-accent-hint" class="collection-status" role="status"></p>
+    <label class="setting-row"><span>Interface compacta</span><input id="appearance-compact" type="checkbox"></label>
+    <label class="setting-row"><span>Painéis opacos</span><input id="appearance-solid" type="checkbox"></label>
+    <label class="setting-row"><span>Animar fundo da Nova Aba</span><input id="appearance-motion" type="checkbox" checked></label>
+    <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
+  </dialog>
+  <dialog id="tab-dialog" aria-labelledby="tab-dialog-heading" aria-describedby="tab-dialog-title">
+    <header class="dialog-heading">
+      <h2 id="tab-dialog-heading">Ações da aba</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar ações da aba" data-static-icon="close"></button>
+    </header>
+    <p id="tab-dialog-title" class="tab-dialog-title"></p>
+    <div class="tab-dialog-actions">
+      <button type="button" id="tab-menu-pin">Fixar aba</button>
+      <button type="button" id="tab-menu-duplicate">Duplicar aba</button>
+      <button type="button" id="tab-menu-up">Mover para cima <kbd>Alt+↑</kbd></button>
+      <button type="button" id="tab-menu-down">Mover para baixo <kbd>Alt+↓</kbd></button>
+      <button type="button" id="tab-menu-close">Fechar aba</button>
+    </div>
+    <form id="tab-menu-move-form" class="workspace-form" hidden>
+      <label for="tab-menu-space">Mover para outro espaço</label>
+      <div class="workspace-fields">
+        <select id="tab-menu-space"></select>
+        <button class="primary" type="submit">Mover</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="page-dialog" aria-labelledby="page-heading">
+    <header class="dialog-heading">
+      <h2 id="page-heading">Ações da página</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar ações da página" data-static-icon="close"></button>
+    </header>
+    <div class="page-zoom" role="group" aria-label="Zoom da página">
+      <span>Zoom</span>
+      <button type="button" id="page-zoom-out" aria-label="Diminuir zoom" title="Ctrl+-">−</button>
+      <button type="button" id="page-zoom-reset" title="Restaurar zoom (Ctrl+0)" aria-label="Restaurar zoom">100%</button>
+      <button type="button" id="page-zoom-in" aria-label="Aumentar zoom" title="Ctrl++">+</button>
+    </div>
+    <button type="button" id="page-duplicate">Duplicar aba</button>
+    <button type="button" id="page-copy">Copiar endereço</button>
+    <p id="page-options-status" class="collection-status" role="status"></p>
+  </dialog>
+  <dialog id="extensions-dialog" aria-labelledby="extensions-heading">
+    <header class="dialog-heading">
+      <h2 id="extensions-heading">Extensões</h2>
+      <button class="icon" type="button" data-dismiss aria-label="Fechar extensões" data-static-icon="close"></button>
+    </header>
+    <ul id="extensions-list"></ul>
+    <p id="extensions-empty">Nenhuma extensão instalada.</p>
+    <form id="extension-form" class="workspace-form">
+      <label for="extension-path">Pasta da extensão descompactada</label>
+      <div class="workspace-fields">
+        <input id="extension-path" type="text" required placeholder="Selecione ou cole o caminho da pasta" aria-describedby="extension-help" spellcheck="false" autocomplete="off">
+        <button id="extension-browse" type="button">Escolher pasta</button>
+        <button class="primary" type="submit">Revisar</button>
+      </div>
+      <section id="extension-review" aria-labelledby="extension-review-title" hidden>
+        <h3 id="extension-review-title"></h3>
+        <p id="extension-review-version"></p>
+        <h4>Permissões declaradas</h4>
+        <ul id="extension-permissions"></ul>
+        <p id="extension-permissions-empty" hidden>O manifesto não declara permissões ou acesso a sites.</p>
+        <button id="extension-confirm" type="button" class="primary">Instalar extensão</button>
+      </section>
+      <p id="extension-help">Use uma pasta confiável com <code>manifest.json</code> na raiz e mantenha os arquivos no local. A instalação pela Chrome Web Store e botões de extensão ainda não estão disponíveis.</p>
+    </form>
+    <p id="extensions-status" class="collection-status" role="status"></p>
   </dialog>
   <dialog id="agent-dialog" aria-labelledby="agent-heading">
     <h2 id="agent-heading">Agente</h2>

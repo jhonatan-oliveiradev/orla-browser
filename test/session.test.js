@@ -134,3 +134,22 @@ test('restores valid saved projects, preserving tab selection, queries, pins and
     queries: ['', 'consulta'], activeIndex: 1, pinnedIndices: [0],
   }]);
 });
+
+test('recovers a previous snapshot when the latest copy is unreadable', () => {
+  const old = JSON.stringify({ workspaces: [{ id: 0, name: 'Projeto', notes: 'Nota local', tabs: ['https://example.com/'] }] });
+  const snapshot = readSession('{invalid', '', old);
+  assert.equal(snapshot.recovered, true);
+  assert.equal(snapshot.notes.get(0), 'Nota local');
+  assert.deepEqual(snapshot.workspaces[0].tabs, ['https://example.com/']);
+  assert.equal(readSession('{"tabs":["https://example.org/"]}', '', old).recovered, false);
+});
+
+test('preserves recently closed pages and sanitizes appearance settings', () => {
+  const state = readSession(JSON.stringify({
+    workspaces: [{ id: 0, recentlyClosed: [{ url: 'javascript:alert(1)' }, { url: 'https://example.com/', pinned: true }] }],
+    appearance: { theme: 'oceano', accent: '#87CC99', density: 'compact', surface: 'solid' },
+  }));
+  assert.deepEqual(state.workspaces[0].recentlyClosed, [{ url: 'https://example.com/', pinned: true, title: '' }]);
+  assert.deepEqual(state.appearance, { theme: 'oceano', accent: '#87cc99', density: 'compact', surface: 'solid', motion: true });
+  assert.equal(readSession('{"appearance":{"accent":"white"}}').appearance.accent, undefined);
+});

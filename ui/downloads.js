@@ -70,5 +70,5 @@ export function initDownloads(invoke) {
     toggle.setAttribute('data-activity', String([...rows.values()].some((item) => item.state === 'running')));
   }
 
-  return { update, reportError };
+  return { update, reportError, restore: (data) => { if (!rows.has(data.id)) update(data); } };
 }

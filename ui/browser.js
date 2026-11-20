@@ -1,7 +1,12 @@
+import { initTabDrag } from './tab-drag.js';
+import { reorderTabs } from './tab-order.js';
 import { duckDuckGo, resolveNavigation } from './address.js';
 import { readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
+import { initPageActions } from './page-actions.js';
 import { initDevTools } from './devtools.js';
+import { initExtensions } from './extensions.js';
+import { initFind } from './find.js';
 import { initDownloads } from './downloads.js';
 import { initOffline } from './offline.js';
 import { releaseIcon, setIcon } from './icons.js';
@@ -11,7 +16,7 @@ import { initOmnibox } from './omnibox.js';
 import { initWebSearch, providerAddress } from './web-search.js';
 import { initHome } from './home.js';
 import { initSidebar } from './sidebar.js';
-import { LEGACY_NOTE_KEY, readSavedProject, readSession, SESSION_KEY, websiteAddress, workspaceNotes } from './session.js';
+import { LEGACY_NOTE_KEY, readSavedProject, readSession, saveSnapshot, SESSION_BACKUP_KEY, SESSION_KEY, websiteAddress, workspaceNotes } from './session.js';
 import { initWorkspaces } from './workspaces.js';
 
 const tauri = window.__TAURI__;
@@ -38,18 +43,20 @@ const notesInput = byId('widget-notes');
 const notesStatus = byId('notes-status');
 
 let snapshot = null;
+let backup = null;
 let history = [];
 let legacyNote;
 try {
   if (tauri) {
     snapshot = localStorage.getItem(SESSION_KEY);
+    backup = localStorage.getItem(SESSION_BACKUP_KEY);
     legacyNote = localStorage.getItem(LEGACY_NOTE_KEY);
     history = readHistory(localStorage.getItem(HISTORY_KEY));
   }
 } catch {
   // Navigation remains available if the WebView storage cannot be read.
 }
-const session = readSession(snapshot, legacyNote);
+const session = readSession(snapshot, legacyNote, backup);
 const projects = session.projects;
 const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
@@ -82,8 +89,8 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
-function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0 }) {
-  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed: [] };
+function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [] }) {
+  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed };
   workspaces.set(id, workspace);
   const pinned = new Set(pinnedIndices);
   for (const [index, url] of urls.entries()) {
@@ -114,9 +121,9 @@ function saveSession() {
   try {
     const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
     for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId }) => ({
-        id, name, notes, ...serializeTabs(groups.get(id), activeId),
+    saveSnapshot(localStorage, {
+      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed }) => ({
+        id, name, notes, recentlyClosed, ...serializeTabs(groups.get(id), activeId),
       })),
       projects,
       activeWorkspaceId: activeWorkspace.id,
@@ -124,7 +131,7 @@ function saveSession() {
       sidebar: sidebarSettings,
       appearance,
       searchProvider,
-    }));
+    });
     storageFailed = false;
     return true;
   } catch {
@@ -136,11 +143,23 @@ function saveSession() {
 
 const showOffline = initOffline();
 const downloads = initDownloads(invoke);
+const extensions = initExtensions(invoke);
+const find = initFind(invoke, (focusId) => {
+  if (focusId !== undefined) schedule(() => syncView(focusId));
+  else scheduleLayout();
+});
 const devtools = initDevTools(invoke, scheduleLayout);
+const pageActions = initPageActions(invoke,
+  () => byId('page-dialog').close(),
+  (url) => schedule(() => openTab(url)),
+);
 
 function render() {
   const tab = tabs.get(activeWorkspace.activeId);
-  devtools.setPage(tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null);
+  const page = tab.loaded && tab.url && !tab.failure ? { id: activeWorkspace.activeId, url: tab.url } : null;
+  devtools.setPage(page);
+  find.setPage(page);
+  pageActions.set(page);
   workspaceControls.renderCurrent(activeWorkspace.name);
   if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
   byId('notes-workspace').textContent = activeWorkspace.name;
@@ -427,12 +446,52 @@ function resetTabPreview(tab) {
 
 const tabRows = new Map();
 
+function canReorder(id) {
+  return !sidebarSettings.collapsed && !tabFilter.value.trim() && tabs.get(id)?.workspaceId === activeWorkspace.id;
+}
+
+function moveTabWithinSpace(source, destination, after) {
+  if (!canReorder(source) || !canReorder(destination)) return;
+  const updated = reorderTabs(orderedTabs(), source, destination, after);
+  if (!updated) return;
+  for (const [id] of updated) tabs.delete(id);
+  for (const [id, tab] of updated) tabs.set(id, tab);
+  saveSession();
+  refreshTabList();
+  if (!home.hidden && !byId('home-resume').hidden) renderResume();
+  const position = updated.findIndex(([id]) => id === source) + 1;
+  byId('tab-order-status').textContent = 'Aba movida para a posição ' + position + ' de ' + updated.length + '.';
+}
+
+function neighboringTab(id, delta) {
+  if (!canReorder(id)) return;
+  const entries = orderedTabs();
+  const position = entries.findIndex(([tabId]) => tabId === id);
+  const neighbor = entries[position + delta];
+  return neighbor?.[1].pinned === entries[position][1].pinned ? neighbor[0] : undefined;
+}
+
+function nudgeTab(id, delta) {
+  const neighbor = neighboringTab(id, delta);
+  if (neighbor !== undefined) moveTabWithinSpace(id, neighbor, delta > 0);
+}
+
+const tabDrag = initTabDrag(tabList, {
+  canDrag: canReorder,
+  canDrop: (source, destination) => source !== destination && canReorder(source) && canReorder(destination)
+    && tabs.get(source).pinned === tabs.get(destination).pinned,
+  move: (source, destination, after) => schedule(() => moveTabWithinSpace(source, destination, after)),
+  onStart: closeTabPreview,
+});
+
 function buildTabRow(id) {
   const row = document.createElement('li');
+  row.dataset.tabRow = String(id);
   const select = document.createElement('button');
   select.className = 'tab-select';
   select.dataset.tabId = String(id);
   select.dataset.focusKey = 'select-' + id;
+  select.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Shift+F10');
   const mark = document.createElement('span');
   mark.className = 'tab-mark';
   mark.setAttribute('aria-hidden', 'true');
@@ -457,10 +516,34 @@ function buildTabRow(id) {
   });
   select.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && previewTarget === select) closeTabPreview();
+    if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) {
+      event.preventDefault();
+      openTabOptions(id);
+    } else if (event.altKey && !event.ctrlKey && !event.shiftKey && !event.metaKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault();
+      schedule(() => nudgeTab(id, event.key === 'ArrowUp' ? -1 : 1));
+    }
   });
 
+  row.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openTabOptions(id);
+  });
+  select.addEventListener('auxclick', (event) => {
+    if (event.button === 1) {
+      event.preventDefault();
+      schedule(() => closeTab(id));
+    }
+  });
   const actions = document.createElement('div');
   actions.className = 'tab-actions';
+  const menu = document.createElement('button');
+  menu.className = 'icon';
+  menu.dataset.focusKey = 'menu-' + id;
+  menu.setAttribute('aria-haspopup', 'dialog');
+  menu.setAttribute('aria-controls', 'tab-dialog');
+  menu.addEventListener('click', () => openTabOptions(id));
+  setIcon(menu, 'more');
   const pin = document.createElement('button');
   pin.className = 'icon';
   pin.dataset.pin = String(id);
@@ -471,9 +554,9 @@ function buildTabRow(id) {
   close.dataset.focusKey = 'close-' + id;
   close.addEventListener('click', () => schedule(() => closeTab(id)));
   setIcon(close, 'close');
-  actions.append(pin, close);
+  actions.append(pin, menu, close);
   row.append(select, actions);
-  const parts = { row, select, mark, text, actions, pin, close };
+  const parts = { row, select, mark, text, actions, pin, menu, close };
   tabRows.set(id, parts);
   return parts;
 }
@@ -514,11 +597,14 @@ function refreshTabList(animatedPinId) {
     if (sidebarSettings.collapsed && id !== activeWorkspace.activeId) continue;
     const title = tab.url ? tab.title || new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba';
     if (filter && !title.toLocaleLowerCase('pt-BR').includes(filter) && !tab.url.toLowerCase().includes(filter)) continue;
-    const { row, select, mark, text, actions, pin, close } = tabRows.get(id) ?? buildTabRow(id);
+    const { row, select, mark, text, actions, pin, menu, close } = tabRows.get(id) ?? buildTabRow(id);
     visible.add(id);
     row.dataset.pinned = String(tab.pinned);
     row.dataset.active = String(id === activeWorkspace.activeId);
     select.setAttribute('aria-label', title);
+    select.draggable = canReorder(id);
+    menu.setAttribute('aria-label', 'Ações da aba ' + title);
+    menu.title = 'Ações da aba';
     if (id === activeWorkspace.activeId) select.setAttribute('aria-current', 'true');
     else select.removeAttribute('aria-current');
     if (!tab.url || sidebarSettings.collapsed) select.title = title;
@@ -555,6 +641,7 @@ function createTab(url = '', pinned = false, workspace = activeWorkspace) {
   const id = nextId++;
   tabs.set(id, { workspaceId: workspace.id, url, loaded: false, pinned, title: knownTitles.get(url) || '' });
   if (workspace === activeWorkspace) workspace.activeId = id;
+  return id;
 }
 
 function detachActiveWorkspaceTab(id) {
@@ -594,6 +681,7 @@ async function syncView(focusTabId) {
     tab.loaded = true;
     render();
   }
+  await pageActions.apply().catch(showError);
   await invoke('show_tab', { id: activeWorkspace.activeId, focus: focusTabId === activeWorkspace.activeId, ...stagePosition() });
 }
 
@@ -655,6 +743,73 @@ function workspaceOptions() {
   return [...workspaces.values()].map(({ id, name }) => ({ id, name, count: counts.get(id) || 0 }));
 }
 
+function moveTabToWorkspace(tabId, workspaceId) {
+  const target = workspaces.get(workspaceId);
+  const tab = tabs.get(tabId);
+  if (!target || target === activeWorkspace || tab?.workspaceId !== activeWorkspace.id || !hasContent(tab)) return false;
+  detachActiveWorkspaceTab(tabId);
+  const targetEntries = workspaceTabs(target);
+  if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
+    tabs.delete(targetEntries[0][0]);
+    target.activeId = tabId;
+  }
+  tab.workspaceId = target.id;
+  tabs.set(tabId, tab);
+  saveSession();
+  byId('tab-order-status').textContent = 'Aba movida para ' + target.name + '.';
+  return true;
+}
+
+const tabDialog = byId('tab-dialog');
+let optionsTabId;
+
+function openTabOptions(id) {
+  const tab = tabs.get(id);
+  if (tab?.workspaceId !== activeWorkspace.id || document.querySelector('dialog[open]')) return;
+  closeTabPreview();
+  optionsTabId = id;
+  byId('tab-dialog-title').textContent = tabRows.get(id).select.getAttribute('aria-label');
+  byId('tab-menu-pin').disabled = !tab.url;
+  byId('tab-menu-pin').textContent = tab.pinned ? 'Desafixar aba' : 'Fixar aba';
+  byId('tab-menu-up').disabled = neighboringTab(id, -1) === undefined;
+  byId('tab-menu-down').disabled = neighboringTab(id, 1) === undefined;
+  const targets = [...workspaces.values()].filter((workspace) => workspace !== activeWorkspace);
+  const field = byId('tab-menu-space');
+  field.replaceChildren(...targets.map(({ id, name }) => new Option(name, id)));
+  byId('tab-menu-move-form').hidden = !targets.length || !hasContent(tab);
+  openDialog(tabDialog);
+}
+
+function tabOption(action) {
+  const id = optionsTabId;
+  if (!tabDialog.open) return;
+  tabDialog.close();
+  schedule(() => {
+    const tab = tabs.get(id);
+    if (tab?.workspaceId === activeWorkspace.id) return action(id, tab);
+  });
+}
+
+byId('tab-menu-pin').addEventListener('click', () => tabOption(togglePin));
+byId('tab-menu-up').addEventListener('click', () => tabOption((id) => nudgeTab(id, -1)));
+byId('tab-menu-down').addEventListener('click', () => tabOption((id) => nudgeTab(id, 1)));
+byId('tab-menu-close').addEventListener('click', () => tabOption(closeTab));
+byId('tab-menu-duplicate').addEventListener('click', () => tabOption(async (_, tab) => {
+  if (!tab.webSearch) return openTab(tab.url);
+  const id = createTab();
+  tabs.get(id).webSearch = searchState(tab.webSearch.query, 'Pesquise novamente para atualizar os resultados.');
+  showCurrentAddress();
+  saveSession();
+  await syncView();
+}));
+byId('tab-menu-move-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const target = Number(byId('tab-menu-space').value);
+  tabOption((id) => {
+    if (moveTabToWorkspace(id, target)) return syncView();
+  });
+});
+
 const workspaceControls = initWorkspaces({
   open: openDialog,
   getState: () => ({
@@ -675,20 +830,7 @@ const workspaceControls = initWorkspaces({
     workspaceControls.renderDialog();
   }),
   move: (id) => schedule(() => {
-    const target = workspaces.get(id);
-    const tabId = activeWorkspace.activeId;
-    const tab = tabs.get(tabId);
-    if (!target || target === activeWorkspace || !hasContent(tab)) return;
-    detachActiveWorkspaceTab(tabId);
-    const targetEntries = workspaceTabs(target);
-    if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
-      tabs.delete(targetEntries[0][0]);
-      target.activeId = tabId;
-    }
-    tab.workspaceId = target.id;
-    tabs.set(tabId, tab);
-    saveSession();
-    workspaceControls.close();
+    if (moveTabToWorkspace(activeWorkspace.activeId, id)) workspaceControls.close();
   }),
   remove: () => schedule(() => {
     const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
@@ -706,6 +848,7 @@ function switchWorkspace(workspace, tabId = workspace.activeId) {
   activeWorkspace = workspace;
   workspace.activeId = tabId;
   tabFilter.value = '';
+  tabDrag.end();
   showCurrentAddress();
   saveSession();
   workspaceControls.close();
@@ -767,13 +910,18 @@ for (const button of document.querySelectorAll('[data-dismiss]')) {
 }
 byId('downloads-toggle').addEventListener('click', () => openDialog(byId('downloads-dialog')));
 byId('offline-retry').addEventListener('click', () => schedule(() => go(tabs.get(activeWorkspace.activeId).url)));
+byId('page-options').addEventListener('click', () => openDialog(byId('page-dialog')));
+byId('extensions-toggle').addEventListener('click', () => {
+  openDialog(byId('extensions-dialog'));
+  void extensions.load();
+});
 byId('appearance').addEventListener('click', () => openDialog(byId('appearance-dialog')));
 byId('agent').addEventListener('click', () => openDialog(byId('agent-dialog')));
 for (const button of [byId('new-tab'), byId('add-tab')]) {
   button.addEventListener('click', () => schedule(() => openTab()));
 }
 reopenButton.addEventListener('click', () => schedule(reopenTab));
-tabFilter.addEventListener('input', refreshTabList);
+tabFilter.addEventListener('input', () => { tabDrag.end(); refreshTabList(); });
 favoriteButton.addEventListener('click', () => {
   const url = tabs.get(activeWorkspace.activeId).url;
   if (!url) return;
@@ -953,11 +1101,27 @@ address.addEventListener('keydown', (event) => {
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'find':
+      omnibox.close();
+      return find.open();
     case 'devtools': devtools.toggle(); return true;
     case 'address':
       omnibox.close();
       address.focus();
       address.select();
+      return true;
+    case 'next-tab':
+    case 'previous-tab':
+      schedule(() => {
+        const ids = orderedTabs().map(([id]) => id);
+        const offset = action === 'next-tab' ? 1 : -1;
+        return selectTab(ids[(ids.indexOf(activeWorkspace.activeId) + offset + ids.length) % ids.length]);
+      });
+      return true;
+    case 'zoom-in':
+    case 'zoom-out':
+    case 'zoom-reset':
+      schedule(() => pageActions.adjust(action));
       return true;
     case 'new-tab': schedule(() => openTab()); return true;
     case 'reopen-tab': schedule(() => reopenTab()); return true;
@@ -976,9 +1140,10 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (!event.ctrlKey || event.repeat) return;
-  const action = (event.shiftKey
-    ? { t: 'reopen-tab' }
-    : { l: 'address', t: 'new-tab', w: 'close-tab' })[event.key.toLowerCase()];
+  const key = event.key.toLowerCase();
+  const action = ({ '+': 'zoom-in', '=': 'zoom-in', '-': 'zoom-out' })[key] || (event.shiftKey
+    ? { t: 'reopen-tab', tab: 'previous-tab' }
+    : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab', tab: 'next-tab', '0': 'zoom-reset' })[key];
   if (runShortcut(action)) event.preventDefault();
 });
 
@@ -1030,6 +1195,13 @@ initSidebar({
   onResize: scheduleLayout,
 });
 renderFavorites();
+if (session.recovered) {
+  byId('session-recovery').hidden = false;
+  saveSession();
+}
+byId('session-recovery-dismiss').addEventListener('click', () => {
+  byId('session-recovery').hidden = true;
+});
 projectControls.render();
 render();
 refreshTabList();
@@ -1059,6 +1231,8 @@ if (tauri) {
       }
       if (payload.finished) {
         devtools.navigated(id);
+        find.navigated(id);
+        if (id === activeWorkspace.activeId) await pageActions.apply().catch(showError);
         tab.ready = true;
         tab.visit = addVisit(history, url, tab.title);
         if (tab.visit) saveHistory();
@@ -1100,6 +1274,13 @@ if (tauri) {
     }));
     await tauri.event.listen('orla-download', ({ payload }) => downloads.update(payload));
     await tauri.event.listen('orla-download-error', ({ payload }) => downloads.reportError(payload));
+    await tauri.event.listen('orla-find', ({ payload }) => find.receive(payload));
+    try {
+      const previous = await invoke('download_history');
+      for (const item of previous || []) downloads.restore(item);
+    } catch (error) {
+      downloads.reportError(error);
+    }
     await tauri.event.listen('orla-devtools', ({ payload }) => devtools.handle(payload));
     await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
     await syncView();

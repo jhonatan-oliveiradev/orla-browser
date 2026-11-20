@@ -22,8 +22,8 @@ pub fn register(core: &ICoreWebView2, app: &AppHandle, label: &str) -> windows_c
     unsafe { core.Settings()?.SetAreDevToolsEnabled(false)? };
     let budget = Rc::new(Cell::new((Instant::now(), 0u16)));
     for event in [
-        "DOM.setChildNodes", "Runtime.consoleAPICalled", "Runtime.exceptionThrown", "Log.entryAdded",
-        "Network.requestWillBeSent", "Network.responseReceived", "Network.loadingFailed",
+        "DOM.setChildNodes", "Page.frameNavigated", "Runtime.consoleAPICalled", "Runtime.exceptionThrown", "Log.entryAdded",
+        "Network.requestWillBeSent", "Network.responseReceived", "Network.loadingFailed", "Network.loadingFinished",
     ] {
         let receiver = unsafe { core.GetDevToolsProtocolEventReceiver(&HSTRING::from(event))? };
         let app = app.clone();
@@ -60,15 +60,24 @@ pub fn register(core: &ICoreWebView2, app: &AppHandle, label: &str) -> windows_c
 
 fn event_data(event: &str, data: Value) -> Value {
     match event {
+        "Page.frameNavigated" => json!({
+            "frame": data["frame"]["id"], "parent": data["frame"]["parentId"],
+        }),
         "Network.requestWillBeSent" => json!({
             "id": data["requestId"], "method": data["request"]["method"],
-            "url": data["request"]["url"], "kind": data["type"],
+            "url": data["request"]["url"], "kind": data["type"], "timestamp": data["timestamp"],
+            "document": data["loaderId"], "frame": data["frameId"],
         }),
         "Network.responseReceived" => json!({
             "id": data["requestId"], "status": data["response"]["status"],
             "kind": data["type"], "url": data["response"]["url"],
+            "mime": data["response"]["mimeType"], "protocol": data["response"]["protocol"],
+            "cache": data["response"]["fromDiskCache"], "timestamp": data["timestamp"],
         }),
-        "Network.loadingFailed" => json!({ "id": data["requestId"], "error": data["errorText"] }),
+        "Network.loadingFailed" => json!({ "id": data["requestId"], "error": data["errorText"], "timestamp": data["timestamp"] }),
+        "Network.loadingFinished" => json!({
+            "id": data["requestId"], "bytes": data["encodedDataLength"], "timestamp": data["timestamp"],
+        }),
         "Runtime.consoleAPICalled" => {
             let args = data["args"].as_array().into_iter().flatten().take(12)
                 .map(console_value).collect::<Vec<_>>().join(" ");
@@ -110,7 +119,7 @@ async fn query(view: &Webview, id: u32, method: &'static str, params: Value, cap
                     else if *current == Some(id) { *current = None; }
                 });
             }
-            if matches!(method, "DOM.getDocument" | "DOM.requestChildNodes" | "CSS.getComputedStyleForNode" | "Runtime.evaluate")
+            if matches!(method, "DOM.getDocument" | "DOM.requestChildNodes" | "CSS.getComputedStyleForNode" | "CSS.getMatchedStylesForNode" | "Runtime.evaluate" | "Overlay.highlightNode" | "Overlay.hideHighlight")
                 && !INSPECTED.with_borrow(|current| *current == Some(id))
             {
                 let _ = send.try_send(Err("A aba não está em inspeção.".into()));
@@ -150,25 +159,43 @@ pub async fn devtools_action(
             for method in ["CSS.enable", "Runtime.enable", "Log.enable", "Network.enable"] {
                 query(&view, id, method, json!({}), None).await?;
             }
-            Ok(Value::Null)
+            let _ = query(&view, id, "Overlay.enable", json!({}), None).await;
+            let _ = query(&view, id, "Page.enable", json!({}), None).await;
+            let frame = query(&view, id, "Page.getFrameTree", json!({}), None).await.unwrap_or(Value::Null);
+            Ok(json!({ "frame": frame["frameTree"]["frame"]["id"] }))
         }
         "stop" => {
             let result = query(&view, id, "Network.disable", json!({}), Some(false)).await;
-            for method in ["Log.disable", "Runtime.disable", "CSS.disable", "DOM.disable"] {
+            for method in ["Overlay.disable", "Page.disable", "Log.disable", "Runtime.disable", "CSS.disable", "DOM.disable"] {
                 let _ = query(&view, id, method, json!({}), None).await;
             }
             result
         }
         "document" => query(&view, id, "DOM.getDocument", json!({ "depth": 2 }), None).await,
-        "children" | "styles" => {
+        "children" | "styles" | "rules" => {
             let node = node_id.filter(|node| *node > 0).ok_or("Elemento inválido.")?;
-            let (method, params) = if action == "children" {
-                ("DOM.requestChildNodes", json!({ "nodeId": node, "depth": 1 }))
-            } else {
-                ("CSS.getComputedStyleForNode", json!({ "nodeId": node }))
+            let method = match action.as_str() {
+                "children" => "DOM.requestChildNodes",
+                "rules" => "CSS.getMatchedStylesForNode",
+                _ => "CSS.getComputedStyleForNode",
             };
+            let params = if action == "children" { json!({ "nodeId": node, "depth": 1 }) } else { json!({ "nodeId": node }) };
             query(&view, id, method, params, None).await
         }
+        "highlight" => {
+            let node = node_id.filter(|node| *node > 0).ok_or("Elemento inválido.")?;
+            query(&view, id, "Overlay.highlightNode", json!({
+                "nodeId": node,
+                "highlightConfig": {
+                    "showInfo": true,
+                    "contentColor": { "r": 103, "g": 164, "b": 240, "a": 0.30 },
+                    "paddingColor": { "r": 111, "g": 204, "b": 148, "a": 0.30 },
+                    "borderColor": { "r": 250, "g": 205, "b": 111, "a": 0.45 },
+                    "marginColor": { "r": 232, "g": 153, "b": 116, "a": 0.34 },
+                }
+            }), None).await
+        }
+        "hide-highlight" => query(&view, id, "Overlay.hideHighlight", json!({}), None).await,
         "evaluate" => {
             let expression = expression.filter(|value| !value.trim().is_empty() && value.len() <= 4096)
                 .ok_or("Digite uma expressão de até 4096 bytes.")?;
