@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readSession, websiteAddress } from '../ui/session.js';
+import { readSavedProject, readSession, websiteAddress } from '../ui/session.js';
 
 test('starts with one blank tab and the original favorites when storage is unavailable', () => {
   for (const value of [null, '{', '{}', '{"tabs":[]}']) {
@@ -179,4 +179,13 @@ test('drops invalid split positions and profile directory names', () => {
   assert.equal(session.workspaces[0].split, undefined);
   assert.equal(session.workspaces[0].profile, undefined);
   assert.equal(session.bookmarkFolders.size, 0);
+});
+
+test('restores captures with safe links and includes them in exported project snapshots', () => {
+  const id = 'acb31a51-2be8-4a37-aeae-a6d083c90445';
+  const clip = { id, url: 'https://example.com/', title: 'Referência', text: '  Trecho  ', note: 'Nota' };
+  const raw = { workspaces: [{ id: 0, clips: [clip, clip, { ...clip, url: 'javascript:alert(1)' }] }] };
+  const restored = readSession(JSON.stringify(raw)).workspaces[0].clips;
+  assert.deepEqual(restored, [{ ...clip, text: 'Trecho' }]);
+  assert.deepEqual(readSavedProject({ name: 'Pesquisa', savedAt: 1, clips: restored }).clips, restored);
 });

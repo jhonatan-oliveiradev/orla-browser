@@ -70,3 +70,9 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 - Nas ações da página, use **Modo de leitura** para simplificar artigos com texto detectável e ajustar fonte, tamanho e largura. **Salvar para ler depois** guarda o endereço em **Retomar**, no espaço atual.
 - Ao criar um espaço, marque **Usar perfil de navegação separado** para ter cookies e logins próprios. Mover uma aba entre perfis recarrega a página no destino. As extensões do perfil padrão não são carregadas nesses espaços.
 - Pressione **Ctrl+Shift+N** ou selecione **Nova janela privada** nos espaços. A janela oferece uma página e controles de navegação e mantém as visitas fora da sessão e do histórico do Orla. Arquivos baixados permanecem no dispositivo.
+
+### Capturas de pesquisa
+
+Selecione um trecho de uma página e pressione **Ctrl+Shift+Y**. Você pode editar o trecho ou acrescentar uma nota antes de salvar. Também pode usar **Ações da página → Capturar página** para guardar só a referência.
+
+As capturas ficam em **Retomar**, no espaço em que foram salvas, e podem ser encontradas pelo texto ou pela nota em **Ctrl+Shift+K**. Ao exportar um projeto, suas capturas seguem junto no arquivo de sessão.

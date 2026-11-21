@@ -266,6 +266,7 @@ fn main() {
             private::open_private,
             private::private_page,
             reader::read_page,
+            reader::page_selection,
             show_tab,
             resize_tabs,
             tab_action,

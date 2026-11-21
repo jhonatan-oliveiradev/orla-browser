@@ -1,8 +1,8 @@
 export function findTabs(query, entries) {
   const normalize = (value) => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
-  return entries.filter(({ title, url, workspace }) => {
-    const haystack = normalize([title, url, workspace].join(' '));
+  return entries.filter(({ title, url, workspace, searchText }) => {
+    const haystack = normalize([title, url, workspace, searchText].join(' '));
     return terms.every((term) => haystack.includes(term));
   }).slice(0, 80);
 }
@@ -21,7 +21,9 @@ export function initQuickTabs(open, entries, select) {
       const title = document.createElement('strong');
       title.textContent = item.title;
       const detail = document.createElement('small');
-      detail.textContent = item.id === undefined ? 'Espaço de trabalho' : item.workspace + (item.url ? ' · ' + item.url : '');
+      detail.textContent = item.clip
+        ? 'Captura · ' + item.workspace + ' · ' + (item.clip.text || item.clip.note || item.url).slice(0, 110)
+        : item.id === undefined ? 'Espaço de trabalho' : item.workspace + (item.url ? ' · ' + item.url : '');
       button.append(title, detail);
       button.addEventListener('click', () => {
         dialog.close();

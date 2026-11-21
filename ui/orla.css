@@ -717,3 +717,12 @@ dialog :is(input, select, button):focus-visible, #find-bar :is(input, button):fo
 #private-stage { margin: 6px; height: calc(100dvh - 69px); padding: 7vw; }
 #private-stage.private-loaded > * { display: none; }
 #private-status { position: fixed; top: 57px; left: 12px; background: var(--toolbar); color: var(--text); padding: 8px; }
+
+#clip-dialog { width: min(620px, 92vw); }
+#clip-form { display: grid; gap: 6px; }
+#clip-form textarea { width: 100%; resize: vertical; min-block-size: 54px; color: var(--text); background: var(--graphite); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+#clip-source { overflow-wrap: anywhere; }
+#clip-status:empty { display: none; }
+#clips-list li { display: flex; align-items: start; gap: 8px; }
+#clips-list .clip-item { display: grid; flex: 1; min-width: 0; text-align: start; }
+#clips-list small { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--muted); }

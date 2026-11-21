@@ -2,7 +2,7 @@ name: Windows validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "feat/**"]
     types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
 

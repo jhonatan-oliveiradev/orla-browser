@@ -21,7 +21,7 @@
       <kbd aria-hidden="true">Ctrl+L</kbd>
     </form>
     <div class="toolbar-tools">
-      <button id="quick-tabs-toggle" class="icon" type="button" aria-label="Encontrar aba ou espaço" title="Encontrar aba ou espaço (Ctrl+Shift+K)" data-static-icon="search"></button>
+      <button id="quick-tabs-toggle" class="icon" type="button" aria-label="Encontrar abas, espaços e capturas" title="Encontrar abas, espaços e capturas (Ctrl+Shift+K)" data-static-icon="search"></button>
       <button id="page-options" class="icon" type="button" aria-label="Ações da página" title="Ações da página" aria-haspopup="dialog" aria-controls="page-dialog" disabled data-static-icon="more"></button>
       <button id="favorite-page" class="icon" aria-label="Favoritar página" aria-pressed="false" disabled></button>
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
@@ -164,6 +164,11 @@
                 <ul class="resume-list" id="resume-closed"></ul>
               </section>
             </div>
+            <section class="home-card" aria-labelledby="clips-title">
+              <h2 id="clips-title">Capturas do espaço</h2>
+              <p id="clips-empty">Selecione um trecho de uma página e pressione Ctrl+Shift+Y para guardar.</p>
+              <ul id="clips-list" class="resume-list"></ul>
+            </section>
             <section class="home-card" aria-labelledby="reading-list-title">
               <h2 id="reading-list-title">Ler depois</h2>
               <p id="reading-list-empty">Guarde páginas pelo menu de ações da página.</p>
@@ -341,7 +346,7 @@
     </form>
     <button id="workspace-save-project" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
     <button id="workspace-remove" type="button" aria-describedby="workspace-remove-hint">Excluir espaço atual</button>
-    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem páginas abertas, notas ou itens de leitura.</p>
+    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem páginas abertas, notas, capturas ou itens de leitura.</p>
   </dialog>
   <dialog id="project-save-dialog" aria-labelledby="project-save-title">
     <h2 id="project-save-title">Salvar sessão</h2>
@@ -402,8 +407,8 @@
     <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
   </dialog>
   <dialog id="quick-tabs" aria-labelledby="quick-tabs-title">
-    <header class="dialog-heading"><h2 id="quick-tabs-title">Encontrar aba ou espaço</h2><button class="icon" type="button" data-dismiss aria-label="Fechar busca" data-static-icon="close"></button></header>
-    <input id="quick-tabs-query" type="search" autocomplete="off" placeholder="Título, endereço ou espaço" aria-label="Buscar abas e espaços" autofocus>
+    <header class="dialog-heading"><h2 id="quick-tabs-title">Encontrar abas, espaços e capturas</h2><button class="icon" type="button" data-dismiss aria-label="Fechar busca" data-static-icon="close"></button></header>
+    <input id="quick-tabs-query" type="search" autocomplete="off" placeholder="Título, endereço ou trecho" aria-label="Buscar abas, espaços e capturas" autofocus>
     <ul id="quick-tabs-results"></ul><p id="quick-tabs-empty" role="status" hidden>Nenhum resultado.</p>
   </dialog>
   <dialog id="bookmarks-dialog" aria-labelledby="bookmarks-heading">
@@ -416,6 +421,18 @@
       <div class="library-actions"><button type="submit" class="primary">Salvar</button><button id="bookmark-edit-cancel" type="button">Cancelar</button></div>
     </form>
     <p id="bookmark-editor-status" role="status"></p>
+  </dialog>
+  <dialog id="clip-dialog" aria-labelledby="clip-heading">
+    <header class="dialog-heading"><h2 id="clip-heading">Capturar página</h2><button class="icon" type="button" data-dismiss aria-label="Fechar captura" data-static-icon="close"></button></header>
+    <p id="clip-source"></p>
+    <form id="clip-form">
+      <label for="clip-text">Trecho</label><textarea id="clip-text" rows="5" maxlength="2000" placeholder="Opcional. A captura sempre guarda o link."></textarea>
+      <label for="clip-note">Sua nota</label><textarea id="clip-note" rows="3" maxlength="500" placeholder="Opcional" autofocus></textarea>
+      <p id="clip-status" role="status"></p>
+      <div class="library-actions">
+        <button type="submit" class="primary">Salvar captura</button><button type="button" id="clip-open-source" hidden>Abrir página</button>
+      </div>
+    </form>
   </dialog>
   <dialog id="reader-dialog" aria-labelledby="reader-heading">
     <header class="dialog-heading"><h2 id="reader-heading">Modo de leitura</h2><button class="icon" type="button" data-dismiss aria-label="Fechar leitura" data-static-icon="close"></button></header>
@@ -459,6 +476,7 @@
       <button type="button" id="page-zoom-reset" title="Restaurar zoom (Ctrl+0)" aria-label="Restaurar zoom">100%</button>
       <button type="button" id="page-zoom-in" aria-label="Aumentar zoom" title="Ctrl++">+</button>
     </div>
+    <button type="button" id="page-capture">Capturar página <kbd>Ctrl+Shift+Y</kbd></button>
     <button type="button" id="page-reader">Modo de leitura</button>
     <button type="button" id="page-reading-save">Salvar para ler depois</button>
     <button type="button" id="page-duplicate">Duplicar aba</button>
