@@ -1,13 +1,17 @@
 # Site do Orla Browser
 
-A landing page é estática e independente do aplicativo desktop. Para abrir uma prévia a partir da raiz do repositório:
+Esta aplicação Next.js usa o App Router, React, TypeScript, Tailwind CSS e Motion. Ela é independente do aplicativo desktop.
 
 ```sh
-python3 -m http.server 4173 --directory website
+cd website
+npm ci
+npm run dev
 ```
 
-Acesse http://localhost:4173. Para publicar, use a pasta `website/` como raiz do site. Ela não precisa de dependências, etapa de build ou servidor de aplicação.
+Acesse http://localhost:3000. Para validar a compilação de produção, execute `npm run build`.
 
-A demonstração usa dados de exemplo. O efeito topográfico usa WebGL em telas maiores com mouse e tem uma versão em SVG para dispositivos móveis, ambientes sem suporte a WebGL e a preferência de movimento reduzido.
+Na Vercel, selecione o preset **Next.js** e configure `website` como **Root Directory**. Use Node.js 22 ou posterior. A página não depende de banco de dados nem de credenciais.
 
-O botão de download aponta para um artefato de teste do GitHub Actions. Quando a distribuição pública estiver disponível, atualize o destino do botão e as instruções de download em `index.html`.
+O botão usa o artefato de prévia do Windows x64 no GitHub Actions. Configure `ORLA_DOWNLOAD_URL` e revise as instruções da página quando houver um instalador de distribuição pública.
+
+Os dados na demonstração são fictícios. A ilustração do hero é uma imagem local otimizada pelo Next.js. A refração em WebGL carrega em segundo plano em telas maiores com mouse. A imagem permanece visível em telas menores e quando o navegador desativa o efeito.
