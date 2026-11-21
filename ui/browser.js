@@ -1,7 +1,10 @@
+import { bindSplit } from './split.js';
+import { initQuickTabs } from './quick-tabs.js';
+import { initReader } from './reader.js';
 import { initTabDrag } from './tab-drag.js';
 import { reorderTabs } from './tab-order.js';
 import { duckDuckGo, resolveNavigation } from './address.js';
-import { readBookmarkFile } from './bookmarks.js';
+import { initBookmarks, readBookmarkFile } from './bookmarks.js';
 import { initProjects } from './projects.js';
 import { initPageActions } from './page-actions.js';
 import { initDevTools } from './devtools.js';
@@ -60,6 +63,8 @@ const session = readSession(snapshot, legacyNote, backup);
 const projects = session.projects;
 const knownTitles = new Map(history.slice().reverse().map(({ url, title }) => [url, title]));
 const favorites = session.favorites;
+const bookmarkFolders = session.bookmarkFolders;
+const folders = session.folders;
 const tabs = new Map();
 const workspaces = new Map();
 let nextId = 0;
@@ -89,8 +94,10 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
-function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [] }) {
-  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed };
+function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [], split, profile = null, reading = [] }) {
+  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed, profile, reading,
+    split: split ? { left: nextId + split.left, right: nextId + split.right, ratio: split.ratio } : null };
+
   workspaces.set(id, workspace);
   const pinned = new Set(pinnedIndices);
   for (const [index, url] of urls.entries()) {
@@ -107,11 +114,14 @@ function newWorkspace(name, project = {}) {
   return mountWorkspace({ ...project, id, name });
 }
 
-function serializeTabs(entries, activeId) {
+function serializeTabs(entries, activeId, split) {
+  const left = split ? entries.findIndex(([id]) => id === split.left) : -1;
+  const right = split ? entries.findIndex(([id]) => id === split.right) : -1;
   return {
     tabs: entries.map(([, tab]) => tab.url),
     queries: entries.map(([, tab]) => tab.webSearch?.query || ''),
     activeIndex: Math.max(0, entries.findIndex(([id]) => id === activeId)),
+    ...(left >= 0 && right >= 0 ? { split: { left, right, ratio: split.ratio } } : {}),
     pinnedIndices: entries.flatMap(([, tab], index) => tab.pinned ? [index] : []),
   };
 }
@@ -122,12 +132,13 @@ function saveSession() {
     const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
     for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
     saveSnapshot(localStorage, {
-      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed }) => ({
-        id, name, notes, recentlyClosed, ...serializeTabs(groups.get(id), activeId),
+      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed, split, profile, reading }) => ({
+        id, name, notes, recentlyClosed, profile, reading, ...serializeTabs(groups.get(id), activeId, split),
       })),
       projects,
       activeWorkspaceId: activeWorkspace.id,
-      favorites: Array.from(favorites, ([url, title]) => ({ url, title })),
+      favorites: Array.from(favorites, ([url, title]) => ({ url, title, folder: bookmarkFolders.get(url) })),
+      folders,
       sidebar: sidebarSettings,
       appearance,
       searchProvider,
@@ -160,6 +171,7 @@ function render() {
   devtools.setPage(page);
   find.setPage(page);
   pageActions.set(page);
+  byId('page-reading-save').textContent = activeWorkspace.reading.some((item) => item.url === tab.url) ? 'Remover de Ler depois' : 'Salvar para ler depois';
   workspaceControls.renderCurrent(activeWorkspace.name);
   if (notesInput.value !== activeWorkspace.notes) notesInput.value = activeWorkspace.notes;
   byId('notes-workspace').textContent = activeWorkspace.name;
@@ -168,6 +180,7 @@ function render() {
   if (!addressDirty) address.value = tab.url || tab.webSearch?.query || '';
   home.hidden = tab.loaded || Boolean(tab.webSearch);
   showOffline(tab.failure);
+  renderSplit();
   webSearch.render(tab.webSearch);
   for (const button of document.querySelectorAll('[data-tab-action]')) {
     button.disabled = !tab.loaded;
@@ -214,18 +227,24 @@ bookmarkFile.addEventListener('change', async () => {
   try {
     const incoming = await readBookmarkFile(file);
     const added = [];
-    for (const [url, title] of incoming) {
+    const length = folders.length;
+    for (const path of incoming.folders) {
+      if (folders.length < 300 && !folders.some((item) => JSON.stringify(item) === JSON.stringify(path))) folders.push(path);
+    }
+    for (const [url, { title, path }] of incoming.bookmarks) {
       if (favorites.has(url)) continue;
       favorites.set(url, title);
+      if (path.length) bookmarkFolders.set(url, path);
       added.push(url);
     }
-    if (added.length && !saveSession()) {
-      for (const url of added) favorites.delete(url);
+    if ((added.length || folders.length !== length) && !saveSession()) {
+      for (const url of added) { favorites.delete(url); bookmarkFolders.delete(url); }
+      folders.splice(length);
       throw new Error('Não foi possível salvar os favoritos neste dispositivo.');
     }
     renderFavorites();
     render();
-    feedback.textContent = added.length ? added.length + (added.length === 1 ? ' favorito importado.' : ' favoritos importados.') : 'Os favoritos do arquivo já estão salvos.';
+    feedback.textContent = added.length ? added.length + (added.length === 1 ? ' favorito importado.' : ' favoritos importados.') : folders.length !== length ? 'Pastas importadas.' : 'Os favoritos do arquivo já estão salvos.';
   } catch (error) {
     feedback.textContent = error.message;
   }
@@ -260,6 +279,7 @@ function orderedTabs() {
 }
 
 function renderResume() {
+  renderReadingList();
   const open = byId('resume-open');
   const closed = byId('resume-closed');
   open.replaceChildren();
@@ -338,9 +358,75 @@ function showCurrentAddress() {
   address.value = tab.url || tab.webSearch?.query || '';
 }
 
-function stagePosition() {
-  const { x, y, width, height } = stage.getBoundingClientRect();
-  return { viewport: { x, y, width, height } };
+const splitView = byId('split-view');
+
+function presentedSplit() {
+  const split = activeWorkspace.split;
+  if (!split || ![split.left, split.right].includes(activeWorkspace.activeId)) return null;
+  return [split.left, split.right].every((id) => tabs.get(id)?.url && !tabs.get(id).failure) ? split : null;
+}
+
+function renderSplit() {
+  const split = presentedSplit();
+  splitView.hidden = !split;
+  if (!split) return;
+  const percent = Math.round(split.ratio * 100);
+  splitView.style.setProperty('--split-left', percent + '%');
+  byId('split-divider').setAttribute('aria-valuenow', percent);
+  for (const side of ['left', 'right']) {
+    const id = split[side];
+    const tab = tabs.get(id);
+    const button = byId('split-' + side + '-title');
+    button.textContent = tab.title || new URL(tab.url).hostname;
+    button.title = tab.url;
+    button.setAttribute('aria-current', String(id === activeWorkspace.activeId));
+  }
+}
+
+function viewportFor(id) {
+  const split = presentedSplit();
+  const pane = split ? byId(id === split.left ? 'split-left' : 'split-right') : stage;
+  const { x, y, width, height } = pane.getBoundingClientRect();
+  return { x, y, width, height };
+}
+
+function visibleIds() {
+  const split = presentedSplit();
+  return split ? [split.left, split.right] : [activeWorkspace.activeId];
+}
+
+function visiblePanes() {
+  return document.querySelector('dialog[open]') ? [] : visibleIds().filter((id) => {
+    const tab = tabs.get(id);
+    return tab.loaded && tab.url && !tab.failure;
+  }).map((id) => ({ id, viewport: viewportFor(id) }));
+}
+
+bindSplit(splitView, (ratio) => {
+  const split = presentedSplit();
+  if (!split) return;
+  split.ratio = ratio;
+  renderSplit();
+  scheduleLayout();
+}, saveSession);
+for (const side of ['left', 'right']) {
+  byId('split-' + side + '-title').addEventListener('click', () => schedule(() => selectTab(presentedSplit()?.[side])));
+}
+byId('split-close').addEventListener('click', () => schedule(async () => {
+  activeWorkspace.split = null;
+  saveSession();
+  await syncView();
+}));
+
+function setSplitFocus(id) {
+  const split = presentedSplit();
+  if (!split || activeWorkspace.activeId === id || (id !== split.left && id !== split.right)) return;
+  activeWorkspace.activeId = id;
+  omnibox.close();
+  showCurrentAddress();
+  render();
+  refreshTabList();
+  saveSession();
 }
 
 async function selectTab(id) {
@@ -648,6 +734,7 @@ function detachActiveWorkspaceTab(id) {
   const ids = orderedTabs().map(([tabId]) => tabId);
   const index = ids.indexOf(id);
   tabs.delete(id);
+  if (activeWorkspace.split && [activeWorkspace.split.left, activeWorkspace.split.right].includes(id)) activeWorkspace.split = null;
   if (id !== activeWorkspace.activeId) return;
   if (ids.length === 1) createTab();
   else activeWorkspace.activeId = ids[index + 1] ?? ids[index - 1];
@@ -663,26 +750,25 @@ async function syncView(focusTabId) {
   refreshTabList();
   if (!home.hidden && !byId('home-resume').hidden) renderResume();
   if (!tauri) return;
-  const tab = tabs.get(activeWorkspace.activeId);
-  if (!tab.url || tab.failure || document.querySelector('dialog[open]')) {
-    await invoke('show_tab', { id: null, focus: Boolean(tab.failure) });
-    return;
-  }
-  if (!tab.loaded) {
-    await invoke('show_tab', { id: null });
-    try {
-      await invoke('navigate_tab', { id: activeWorkspace.activeId, address: tab.url, ...stagePosition() });
-    } catch {
-      tab.failure = 'navigation';
+  if (!document.querySelector('dialog[open]')) {
+    for (const id of visibleIds()) {
+      const tab = tabs.get(id);
+      if (!tab.url || tab.failure || tab.loaded) continue;
+      try {
+        await invoke('navigate_tab', { id, address: tab.url, viewport: viewportFor(id), profile: activeWorkspace.profile });
+      } catch {
+        tab.failure = 'navigation';
+      }
       tab.loaded = true;
-      render();
-      return;
     }
-    tab.loaded = true;
     render();
+    await pageActions.apply().catch(showError);
   }
-  await pageActions.apply().catch(showError);
-  await invoke('show_tab', { id: activeWorkspace.activeId, focus: focusTabId === activeWorkspace.activeId, ...stagePosition() });
+  const panes = visiblePanes();
+  const focus = panes.some(({ id }) => id === focusTabId);
+  const active = tabs.get(activeWorkspace.activeId);
+  await invoke('show_tab', { id: focus ? focusTabId : null, focus: focus || Boolean(active.failure && !panes.length), panes });
+
 }
 
 async function go(url) {
@@ -694,7 +780,7 @@ async function go(url) {
   const id = activeWorkspace.activeId;
   const tab = tabs.get(id);
   try {
-    await invoke('navigate_tab', { id, address: target, ...stagePosition() });
+    await invoke('navigate_tab', { id, address: target, viewport: viewportFor(id), profile: activeWorkspace.profile });
     delete tab.failure;
   } catch {
     tab.failure = 'navigation';
@@ -740,13 +826,19 @@ function workspaceOptions() {
   for (const { workspaceId, url, webSearch } of tabs.values()) {
     if (url || webSearch) counts.set(workspaceId, (counts.get(workspaceId) || 0) + 1);
   }
-  return [...workspaces.values()].map(({ id, name }) => ({ id, name, count: counts.get(id) || 0 }));
+  return [...workspaces.values()].map(({ id, name, profile }) => ({ id, name, profile, count: counts.get(id) || 0 }));
 }
 
-function moveTabToWorkspace(tabId, workspaceId) {
+async function moveTabToWorkspace(tabId, workspaceId) {
   const target = workspaces.get(workspaceId);
   const tab = tabs.get(tabId);
   if (!target || target === activeWorkspace || tab?.workspaceId !== activeWorkspace.id || !hasContent(tab)) return false;
+  if (tab.loaded && target.profile !== activeWorkspace.profile) {
+    await invoke('tab_action', { id: tabId, action: 'close' });
+    tab.loaded = false;
+    delete tab.failure;
+    resetTabPreview(tab);
+  }
   detachActiveWorkspaceTab(tabId);
   const targetEntries = workspaceTabs(target);
   if (targetEntries.length === 1 && !hasContent(targetEntries[0][1])) {
@@ -769,6 +861,9 @@ function openTabOptions(id) {
   closeTabPreview();
   optionsTabId = id;
   byId('tab-dialog-title').textContent = tabRows.get(id).select.getAttribute('aria-label');
+  const splitButton = byId('tab-menu-split');
+  const active = tabs.get(activeWorkspace.activeId);
+  splitButton.disabled = id === activeWorkspace.activeId || !tab.url || !active.url || Boolean(tab.failure || active.failure);
   byId('tab-menu-pin').disabled = !tab.url;
   byId('tab-menu-pin').textContent = tab.pinned ? 'Desafixar aba' : 'Fixar aba';
   byId('tab-menu-up').disabled = neighboringTab(id, -1) === undefined;
@@ -790,6 +885,15 @@ function tabOption(action) {
   });
 }
 
+byId('tab-menu-split').addEventListener('click', () => tabOption(async (id) => {
+  const left = activeWorkspace.activeId;
+  if (left === id || !tabs.get(left)?.url || !tabs.get(id)?.url) return;
+  activeWorkspace.split = { left, right: id, ratio: .5 };
+  activeWorkspace.activeId = id;
+  showCurrentAddress();
+  saveSession();
+  await syncView(id);
+}));
 byId('tab-menu-pin').addEventListener('click', () => tabOption(togglePin));
 byId('tab-menu-up').addEventListener('click', () => tabOption((id) => nudgeTab(id, -1)));
 byId('tab-menu-down').addEventListener('click', () => tabOption((id) => nudgeTab(id, 1)));
@@ -805,8 +909,8 @@ byId('tab-menu-duplicate').addEventListener('click', () => tabOption(async (_, t
 byId('tab-menu-move-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const target = Number(byId('tab-menu-space').value);
-  tabOption((id) => {
-    if (moveTabToWorkspace(id, target)) return syncView();
+  tabOption(async (id) => {
+    if (await moveTabToWorkspace(id, target)) return syncView();
   });
 });
 
@@ -816,26 +920,29 @@ const workspaceControls = initWorkspaces({
     spaces: workspaceOptions(),
     activeId: activeWorkspace.id,
     canMove: hasContent(tabs.get(activeWorkspace.activeId)),
-    canRemove: workspaces.size > 1 && !activeWorkspace.notes.trim() && workspaceTabs().every(([, tab]) => !hasContent(tab)),
+    canRemove: workspaces.size > 1 && !activeWorkspace.notes.trim() && !activeWorkspace.reading.length && workspaceTabs().every(([, tab]) => !hasContent(tab)),
   }),
   select: (id) => schedule(() => {
     const workspace = workspaces.get(id);
     if (workspace) switchWorkspace(workspace);
   }),
-  create: (name) => schedule(() => switchWorkspace(newWorkspace(name))),
+  create: (name, isolated) => schedule(() => {
+    const profile = isolated ? Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('') : null;
+    switchWorkspace(newWorkspace(name, { profile }));
+  }),
   rename: (name) => schedule(() => {
     activeWorkspace.name = name;
     saveSession();
     workspaceControls.renderCurrent(name);
     workspaceControls.renderDialog();
   }),
-  move: (id) => schedule(() => {
-    if (moveTabToWorkspace(activeWorkspace.activeId, id)) workspaceControls.close();
+  move: (id) => schedule(async () => {
+    if (await moveTabToWorkspace(activeWorkspace.activeId, id)) workspaceControls.close();
   }),
   remove: () => schedule(() => {
     const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
     const entries = workspaceTabs();
-    if (!target || activeWorkspace.notes.trim() || entries.some(([, tab]) => hasContent(tab))) return;
+    if (!target || activeWorkspace.notes.trim() || activeWorkspace.reading.length || entries.some(([, tab]) => hasContent(tab))) return;
     for (const [id] of entries) tabs.delete(id);
     workspaces.delete(activeWorkspace.id);
     switchWorkspace(target);
@@ -870,7 +977,7 @@ const projectControls = initProjects({
     const entries = workspaceTabs().filter(([, tab]) => hasContent(tab));
     const project = readSavedProject({
       name, savedAt: Date.now(), notes: activeWorkspace.notes,
-      ...serializeTabs(entries, activeWorkspace.activeId),
+      ...serializeTabs(entries, activeWorkspace.activeId, activeWorkspace.split),
     });
     if (!project) return 'Abra uma página ou escreva uma nota antes de salvar a sessão.';
     return addProject(project) || 'Não foi possível gravar a sessão neste dispositivo.';
@@ -925,7 +1032,10 @@ tabFilter.addEventListener('input', () => { tabDrag.end(); refreshTabList(); });
 favoriteButton.addEventListener('click', () => {
   const url = tabs.get(activeWorkspace.activeId).url;
   if (!url) return;
-  if (favorites.has(url)) favorites.delete(url);
+  if (favorites.has(url)) {
+    favorites.delete(url);
+    bookmarkFolders.delete(url);
+  }
   else favorites.set(url, new URL(url).hostname);
   saveSession();
   renderFavorites();
@@ -1098,9 +1208,80 @@ address.addEventListener('keydown', (event) => {
   address.select();
 });
 
+const openQuickTabs = initQuickTabs(openDialog, () => {
+  const spaces = [activeWorkspace, ...[...workspaces.values()].filter((workspace) => workspace !== activeWorkspace)];
+  return spaces.flatMap((workspace) => [
+    { title: workspace.name, workspaceId: workspace.id },
+    ...workspaceTabs(workspace).map(([id, tab]) => ({
+      id, workspaceId: workspace.id, workspace: workspace.name, url: tab.url,
+      title: tab.title || (tab.url ? new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba'),
+    })),
+  ]);
+}, ({ id, workspaceId }) => schedule(async () => {
+  const workspace = workspaces.get(workspaceId);
+  if (workspace) await selectTab(id ?? workspace.activeId);
+}));
+byId('quick-tabs-toggle').addEventListener('click', openQuickTabs);
+
+function openPrivate() {
+  return invoke('open_private');
+}
+byId('private-window').addEventListener('click', () => schedule(async () => {
+  await openPrivate();
+  workspaceControls.close();
+}));
+
+const openReader = initReader(invoke, openDialog);
+byId('page-reader').addEventListener('click', () => void openReader(activeWorkspace.activeId));
+byId('page-reading-save').addEventListener('click', () => {
+  const { url, title } = tabs.get(activeWorkspace.activeId);
+  if (!url) return;
+  const reading = activeWorkspace.reading;
+  const index = reading.findIndex((item) => item.url === url);
+  if (index < 0) {
+    reading.unshift({ url, title: title || new URL(url).hostname });
+    if (reading.length > 100) reading.pop();
+  } else reading.splice(index, 1);
+  saveSession();
+  renderReadingList();
+  byId('page-reading-save').textContent = index < 0 ? 'Remover de Ler depois' : 'Salvar para ler depois';
+  byId('page-options-status').textContent = index < 0 ? 'Página salva neste espaço.' : 'Página removida da lista.';
+});
+
+function renderReadingList() {
+  const reading = activeWorkspace.reading;
+  const list = byId('reading-list');
+  list.replaceChildren();
+  byId('reading-list-empty').hidden = Boolean(reading.length);
+  for (const { url, title } of reading) {
+    const row = resumeRow(url, () => openTab(url), title);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remover';
+    remove.setAttribute('aria-label', 'Remover da lista: ' + title);
+    remove.addEventListener('click', () => {
+      const index = reading.findIndex((item) => item.url === url);
+      if (index >= 0) reading.splice(index, 1);
+      saveSession();
+      renderReadingList();
+      (list.querySelector('button') ?? byId('home-resume-tab')).focus();
+    });
+    row.append(remove);
+    list.append(row);
+  }
+}
+
+initBookmarks(favorites, bookmarkFolders, folders, () => {
+  const saved = saveSession();
+  renderFavorites();
+  return saved;
+}, openDialog, (url) => schedule(() => go(url)));
+
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'quick-tabs': openQuickTabs(); return true;
+    case 'private': schedule(openPrivate); return true;
     case 'find':
       omnibox.close();
       return find.open();
@@ -1142,7 +1323,7 @@ document.addEventListener('keydown', (event) => {
   if (!event.ctrlKey || event.repeat) return;
   const key = event.key.toLowerCase();
   const action = ({ '+': 'zoom-in', '=': 'zoom-in', '-': 'zoom-out' })[key] || (event.shiftKey
-    ? { t: 'reopen-tab', tab: 'previous-tab' }
+    ? { t: 'reopen-tab', tab: 'previous-tab', k: 'quick-tabs', n: 'private' }
     : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab', tab: 'next-tab', '0': 'zoom-reset' })[key];
   if (runShortcut(action)) event.preventDefault();
 });
@@ -1160,7 +1341,7 @@ function scheduleLayout() {
     resizePending = false;
     resizing = true;
     try {
-      await invoke('resize_tabs', stagePosition());
+      await invoke('resize_tabs', { panes: visiblePanes() });
     } catch (error) {
       showError(error);
     } finally {
@@ -1223,9 +1404,9 @@ if (tauri) {
       if (payload.failure) {
         tab.failure = payload.failure;
         tab.loaded = true;
-        if (id === activeWorkspace.activeId) {
+        if (tab.workspaceId === activeWorkspace.id) {
           await syncView();
-          byId('offline-retry').focus();
+          if (id === activeWorkspace.activeId) byId('offline-retry').focus();
         }
         return;
       }
@@ -1282,9 +1463,17 @@ if (tauri) {
       downloads.reportError(error);
     }
     await tauri.event.listen('orla-devtools', ({ payload }) => devtools.handle(payload));
-    await tauri.event.listen('orla-shortcut', ({ payload }) => runShortcut(payload));
+    await tauri.event.listen('orla-tab-focus', ({ payload }) => schedule(() => setSplitFocus(payload)));
+    await tauri.event.listen('orla-shortcut', ({ payload }) => schedule(() => {
+      if (typeof payload === 'string') runShortcut(payload);
+      else {
+        setSplitFocus(payload.id);
+        runShortcut(payload.action);
+      }
+    }));
     await syncView();
   });
-  new ResizeObserver(scheduleLayout).observe(stage);
+  const stageObserver = new ResizeObserver(scheduleLayout);
+  for (const pane of [stage, byId('split-left'), byId('split-right')]) stageObserver.observe(pane);
   window.addEventListener('resize', scheduleLayout);
 }

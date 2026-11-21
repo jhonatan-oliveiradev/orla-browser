@@ -1,3 +1,4 @@
+import { readSplit } from './split.js';
 import { readAppearance } from './appearance.js';
 import { sidebarWidth } from './sidebar.js';
 
@@ -45,7 +46,23 @@ function readTabGroup(value) {
   const queries = Array.isArray(value?.queries)
     ? tabs.map((url, index) => url ? '' : searchQuery(value.queries[index]))
     : tabs.map(() => '');
-  return { tabs, queries, activeIndex, pinnedIndices };
+  const split = readSplit(value?.split, tabs);
+  return { tabs, queries, activeIndex, pinnedIndices, ...(split ? { split } : {}) };
+}
+
+export function readProfile(value) {
+  return typeof value === 'string' && /^[a-f0-9]{32}$/.test(value) ? value : null;
+}
+
+export function readReadingList(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value.slice(0, 100).flatMap((item) => {
+    const url = websiteAddress(item?.url);
+    if (!url || seen.has(url)) return [];
+    seen.add(url);
+    return [{ url, title: typeof item.title === 'string' && item.title.trim() ? item.title.slice(0, 160) : new URL(url).hostname }];
+  });
 }
 
 export function workspaceNotes(value) {
@@ -102,6 +119,8 @@ export function readSession(serialized, legacyNote, backup) {
             return url ? [{ url, pinned: item.pinned === true, title: typeof item.title === 'string' ? item.title.slice(0, 160) : '' }] : [];
           }),
         } : {}),
+        ...(readProfile(entry.profile) ? { profile: readProfile(entry.profile) } : {}),
+        ...(Array.isArray(entry.reading) ? { reading: readReadingList(entry.reading) } : {}),
         ...readTabGroup(entry),
       });
     }
@@ -122,11 +141,22 @@ export function readSession(serialized, legacyNote, backup) {
     const title = typeof item.title === 'string' ? item.title.trim().slice(0, 100) : '';
     favorites.set(url, title || new URL(url).hostname);
   }
+  const bookmarkFolders = new Map();
+  for (const item of (Array.isArray(saved?.favorites) ? saved.favorites : [])) {
+    const url = websiteAddress(item?.url);
+    const path = readFolderPath(item?.folder);
+    if (favorites.has(url) && path.length && !bookmarkFolders.has(url)) bookmarkFolders.set(url, path);
+  }
+  const folders = (Array.isArray(saved?.folders) ? saved.folders : []).slice(0, 300).map(readFolderPath).filter((path) => path.length);
   const sidebar = {
     width: sidebarWidth(saved?.sidebar?.width),
     collapsed: saved?.sidebar?.collapsed === true,
   };
   const appearance = readAppearance(saved?.appearance);
   const searchProvider = typeof saved?.searchProvider === 'string' ? saved.searchProvider.slice(0, 500) : '';
-  return { workspaces, activeWorkspaceId, notes, projects, favorites, sidebar, appearance, searchProvider, recovered: Boolean(recovered) };
+  return { workspaces, activeWorkspaceId, notes, projects, favorites, bookmarkFolders, folders, sidebar, appearance, searchProvider, recovered: Boolean(recovered) };
+}
+
+export function readFolderPath(value) {
+  return Array.isArray(value) ? value.slice(0, 12).map(workspaceName).filter(Boolean) : [];
 }

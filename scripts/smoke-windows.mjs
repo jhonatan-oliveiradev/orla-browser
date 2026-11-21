@@ -16,7 +16,8 @@ const fixture = createServer((request, response) => {
     return;
   }
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end('<!doctype html><title>Teste local Orla</title><style>body{background:white}</style><main><p>marcador</p><p>marcador</p><a id="download" href="/fixture.txt" download>Baixar</a></main>');
+  const title = request.url === '/second' ? 'Segundo painel Orla' : 'Teste local Orla';
+  response.end('<!doctype html><title>' + title + '</title><style>body{background:white}</style><main><h1>Artigo Orla</h1><p>marcador</p><p>marcador</p><p>' + 'Uma frase para validar a leitura simplificada. '.repeat(5) + '</p><a id="download" href="/fixture.txt" download>Baixar</a></main>');
 });
 fixture.listen(0, '127.0.0.1');
 await once(fixture, 'listening');
@@ -69,7 +70,7 @@ async function run(phase) {
 try {
   await run('exercise');
   await run('verify');
-  console.log('Passou: busca nativa, DevTools, extensão e persistência de abas, notas e downloads.');
+  console.log('Passou: busca nativa, DevTools, extensão, tela dividida, leitura, cookies isolados, janela privada e persistência de abas, notas e downloads.');
 } finally {
   fixture.close();
   await rm(scratch, { recursive: true, force: true });

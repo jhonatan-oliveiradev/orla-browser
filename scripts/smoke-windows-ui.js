@@ -39,6 +39,7 @@
     await until('A interface do Orla não abriu.', () => get('#address') && get('#tab-list button'));
     if (phase === 'verify') {
       await until('A aba do projeto não foi restaurada.', () => contains('#tab-list', 'Teste local Orla'));
+      await until('O par de abas não foi restaurado.', () => !get('#split-view').hidden && get('#split-divider').getAttribute('aria-valuenow') === '54');
       click('#downloads-toggle');
       await until('O histórico de downloads não foi restaurado.', () => contains('#downloads-list', 'orla-smoke.txt'));
       get('#downloads-dialog').close();
@@ -100,9 +101,56 @@
       await until('A extensão não foi executada na página.', async () => (
         await evaluatePage('document.documentElement.dataset.orlaSmoke')
       ).text === 'loaded');
+      await evaluatePage("document.cookie = 'orla_profile=regular; path=/'");
+      await until('O cookie do perfil padrão não foi criado.', async () => (await evaluatePage('document.cookie')).text.includes('orla_profile=regular'));
       await evaluatePage('document.getElementById("download").click()');
       click('#downloads-toggle');
       await until('O download não foi concluído.', () => contains('#downloads-list', 'Concluído'));
+
+      get('#downloads-dialog').close();
+      if (!get('#devtools-panel').hidden) click('#devtools-close');
+      click('#page-options');
+      await until('As ações da página não abriram.', () => get('#page-dialog').open);
+      click('#page-reader');
+      await until('O texto do artigo não apareceu.', () => contains('#reader-content', 'Artigo Orla'));
+      get('#reader-dialog').close();
+      click('#workspace-toggle');
+      await until('Os espaços de trabalho não abriram.', () => get('#workspaces-dialog').open);
+      fill('#workspace-create-name', 'Perfil isolado');
+      get('#workspace-isolated').checked = true;
+      get('#workspace-create-form').requestSubmit();
+      await until('O perfil separado não abriu.', () => contains('#workspace-name', 'Perfil isolado'));
+      fill('#address', url);
+      get('#address-form').requestSubmit();
+      await until('O perfil separado não navegou.', () => contains('#tab-list', 'Teste local Orla'));
+      click('#devtools-toggle');
+      await until('O cookie vazou entre perfis.', async () => (await evaluatePage('document.cookie')).text === '');
+      click('#devtools-close');
+      click('#quick-tabs-toggle');
+      await until('A busca entre espaços não abriu.', () => get('#quick-tabs').open);
+      fill('#quick-tabs-query', 'Principal');
+      get('#quick-tabs-results button').click();
+      await until('O espaço Principal não voltou.', () => contains('#workspace-name', 'Principal'));
+
+      click('#new-tab');
+      await until('A nova aba não abriu.', () => get('#address').value === '');
+      fill('#address', new URL('/second', url).href);
+      get('#address-form').requestSubmit();
+      await until('O segundo site não abriu.', () => contains('#tab-list', 'Segundo painel Orla'));
+      const sourceRow = [...get('#tab-list').children].find((row) => row.innerText.includes('Teste local Orla'));
+      sourceRow.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      await until('As ações da aba não abriram.', () => get('#tab-dialog').open);
+      click('#tab-menu-split');
+      await until('As páginas não abriram lado a lado.', () => !get('#split-view').hidden
+        && get('#split-left').getBoundingClientRect().right < get('#split-right').getBoundingClientRect().left);
+      get('#split-divider').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await until('O divisor não mudou de posição.', () => get('#split-divider').getAttribute('aria-valuenow') === '54');
+      click('#split-left-title');
+      await until('O endereço da aba esquerda não foi selecionado.', () => get('#address').value.endsWith('/second'));
+      await window.__TAURI__.core.invoke('open_private');
+      window.orlaSmokePrivate = true;
+      await until('O teste da janela privada não respondeu.', () => window.orlaSmokePrivatePassed);
+
     }
     if (get('#widget-notes').value !== 'Nota de teste do Orla') throw new Error('A nota do espaço ficou indisponível.');
     window.orlaSmokeResult = 'ok';

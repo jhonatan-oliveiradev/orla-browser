@@ -1,6 +1,6 @@
 use tauri::{Emitter, Manager, Webview};
 use webview2_com::{
-    AcceleratorKeyPressedEventHandler,
+    AcceleratorKeyPressedEventHandler, FocusChangedEventHandler,
     Microsoft::Web::WebView2::Win32::{
         COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
         COREWEBVIEW2_PHYSICAL_KEY_STATUS,
@@ -19,7 +19,15 @@ fn pressed(key: u16) -> bool {
 
 pub fn attach(view: &Webview) -> CommandResult {
     let app = view.app_handle().clone();
+    let id = view.label().trim_start_matches("tab-").parse::<u32>().map_err(|error| error.to_string())?;
     view.with_webview(move |platform| {
+        let focus_app = app.clone();
+        let focus = FocusChangedEventHandler::create(Box::new(move |_, _| {
+            let _ = focus_app.emit_to(SHELL, "orla-tab-focus", id);
+            Ok(())
+        }));
+        let mut focus_token = 0;
+        let _ = unsafe { platform.controller().add_GotFocus(&focus, &mut focus_token) };
         let handler = AcceleratorKeyPressedEventHandler::create(Box::new(move |_, args| {
             let Some(args) = args else { return Ok(()) };
             let mut kind = COREWEBVIEW2_KEY_EVENT_KIND::default();
@@ -44,6 +52,8 @@ pub fn attach(view: &Webview) -> CommandResult {
                 (0xbb | 0x6b, true, _) => "zoom-in",
                 (0xbd | 0x6d, true, _) => "zoom-out",
                 (0x30 | 0x60, true, false) => "zoom-reset",
+                (0x4b, true, true) => "quick-tabs",
+                (0x4e, true, true) => "private",
                 (0x46, true, false) => "find",
                 (0x4c, true, false) => "address",
                 (0x54, true, false) => "new-tab",
@@ -60,7 +70,7 @@ pub fn attach(view: &Webview) -> CommandResult {
             tauri::async_runtime::spawn(async move {
                 if let Some(shell) = app.get_webview(SHELL) {
                     if !action.starts_with("zoom-") { let _ = shell.set_focus(); }
-                    let _ = app.emit_to(SHELL, "orla-shortcut", action);
+                    let _ = app.emit_to(SHELL, "orla-shortcut", serde_json::json!({ "action": action, "id": id }));
                 }
             });
             Ok(())

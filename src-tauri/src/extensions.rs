@@ -13,10 +13,15 @@ use crate::{as_message, ui_only, SHELL};
 const HOST: &str = "extension-profile";
 static HOST_INIT: OnceLock<Mutex<()>> = OnceLock::new();
 
-pub fn site_profile(builder: WebviewBuilder<tauri::Wry>, app: &AppHandle) -> Result<WebviewBuilder<tauri::Wry>, String> {
-    let directory = app.path().app_local_data_dir().map_err(as_message)?.join("Sites");
+pub fn site_profile(builder: WebviewBuilder<tauri::Wry>, app: &AppHandle, profile: Option<&str>) -> Result<WebviewBuilder<tauri::Wry>, String> {
+    let root = app.path().app_local_data_dir().map_err(as_message)?;
+    let directory = match profile {
+        Some(key) if key.len() == 32 && key.bytes().all(|c| c.is_ascii_hexdigit()) => root.join("Profiles").join(key),
+        Some(_) => return Err("Perfil inválido.".into()),
+        None => root.join("Sites"),
+    };
     std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-    Ok(builder.data_directory(directory).browser_extensions_enabled(true))
+    Ok(builder.data_directory(directory).browser_extensions_enabled(profile.is_none()))
 }
 
 fn host(app: &AppHandle) -> Result<Webview, String> {
@@ -24,7 +29,7 @@ fn host(app: &AppHandle) -> Result<Webview, String> {
     let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
     let builder = WebviewBuilder::new(HOST, WebviewUrl::External("about:blank".parse().unwrap()))
         .on_navigation(|url| url.as_str() == "about:blank");
-    let view = window.add_child(site_profile(builder, app)?, LogicalPosition::new(-100, -100), LogicalSize::new(1, 1))
+    let view = window.add_child(site_profile(builder, app, None)?, LogicalPosition::new(-100, -100), LogicalSize::new(1, 1))
         .map_err(as_message)?;
     view.hide().map_err(as_message)?;
     Ok(view)

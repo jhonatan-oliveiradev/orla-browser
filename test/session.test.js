@@ -153,3 +153,30 @@ test('preserves recently closed pages and sanitizes appearance settings', () => 
   assert.deepEqual(state.appearance, { theme: 'oceano', accent: '#87cc99', density: 'compact', surface: 'solid', motion: true });
   assert.equal(readSession('{"appearance":{"accent":"white"}}').appearance.accent, undefined);
 });
+
+test('restores a valid split pair, isolated profile, reading list and bookmark paths', () => {
+  const profile = 'a'.repeat(32);
+  const session = readSession(JSON.stringify({
+    workspaces: [{
+      id: 1, tabs: ['https://example.com', 'https://example.org'], split: { left: 0, right: 1, ratio: 1 },
+      profile, reading: [{ url: 'https://example.com' }, { url: 'javascript:1' }, { url: 'https://example.com' }],
+    }],
+    favorites: [{ url: 'https://example.com', title: 'Exemplo', folder: ['Projeto', 'Documentos'] }],
+    folders: [['Outra pasta']],
+  }));
+  assert.deepEqual(session.workspaces[0].split, { left: 0, right: 1, ratio: .72 });
+  assert.equal(session.workspaces[0].profile, profile);
+  assert.deepEqual(session.workspaces[0].reading, [{ url: 'https://example.com/', title: 'example.com' }]);
+  assert.deepEqual(session.bookmarkFolders.get('https://example.com/'), ['Projeto', 'Documentos']);
+  assert.deepEqual(session.folders, [['Outra pasta']]);
+});
+
+test('drops invalid split positions and profile directory names', () => {
+  const session = readSession(JSON.stringify({
+    workspaces: [{ id: 1, tabs: ['https://example.com', ''], split: { left: 0, right: 1 }, profile: '../Sites' }],
+    favorites: {},
+  }));
+  assert.equal(session.workspaces[0].split, undefined);
+  assert.equal(session.workspaces[0].profile, undefined);
+  assert.equal(session.bookmarkFolders.size, 0);
+});
