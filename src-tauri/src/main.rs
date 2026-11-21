@@ -3,6 +3,12 @@
 #[cfg(windows)]
 mod devtools;
 #[cfg(windows)]
+mod download_store;
+#[cfg(windows)]
+mod extensions;
+#[cfg(windows)]
+mod find;
+#[cfg(windows)]
 mod shortcuts;
 #[cfg(windows)]
 mod site_events;
@@ -99,6 +105,7 @@ async fn navigate_tab(
     let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
     let bounds = viewport.bounds(&window)?;
     let builder = WebviewBuilder::new(label, WebviewUrl::External(Url::parse("about:blank").unwrap()))
+        .zoom_hotkeys_enabled(false)
         .on_navigation(website)
         .on_new_window(|_, _| NewWindowResponse::Deny)
         .on_document_title_changed(|view, title| {
@@ -114,6 +121,8 @@ async fn navigate_tab(
                 );
             }
         });
+    #[cfg(windows)]
+    let builder = extensions::site_profile(builder, &app)?;
     let view = window.add_child(builder, bounds.position, bounds.size).map_err(as_message)?;
     #[cfg(windows)]
     {
@@ -183,12 +192,25 @@ async fn tab_action(caller: Webview, app: AppHandle, id: u32, action: String) ->
     .map_err(as_message)
 }
 
+#[tauri::command]
+async fn zoom_tab(caller: Webview, app: AppHandle, id: u32, percent: u16) -> CommandResult {
+    ui_only(&caller)?;
+    if !(50..=200).contains(&percent) {
+        return Err("Zoom fora do intervalo permitido.".into());
+    }
+    let view = app.get_webview(&tab_label(id)).ok_or("Aba indisponível.")?;
+    view.set_zoom(f64::from(percent) / 100.0).map_err(as_message)
+}
+
 #[cfg(not(windows))]
 mod site_events {
     #[tauri::command]
     pub fn tab_preview(id: u32, width: u32, height: u32) {
         let _ = (id, width, height);
     }
+
+    #[tauri::command]
+    pub fn download_history() -> Vec<serde_json::Value> { Vec::new() }
 
     #[tauri::command]
     pub fn download_action(id: u32, action: String) -> super::CommandResult {
@@ -205,17 +227,48 @@ mod devtools {
     }
 }
 
+#[cfg(not(windows))]
+mod extensions {
+    #[tauri::command]
+    pub fn choose_extension_folder() -> Result<Option<String>, String> {
+        Err("Extensões estão disponíveis no Windows.".into())
+    }
+
+    #[tauri::command]
+    pub fn extension_action() -> Result<serde_json::Value, String> {
+        Err("Extensões estão disponíveis no Windows.".into())
+    }
+}
+
+#[cfg(not(windows))]
+mod find {
+    #[tauri::command]
+    pub fn find_in_page() -> super::CommandResult {
+        Err("Busca na página está disponível no Windows.".into())
+    }
+}
+
+#[cfg(all(windows, debug_assertions, feature = "windows-smoke"))]
+mod smoke;
+
 fn main() {
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
+    let app = tauri::Builder::default();
+    #[cfg(all(windows, debug_assertions, feature = "windows-smoke"))]
+    let app = app.setup(smoke::setup);
+    app.invoke_handler(tauri::generate_handler![
             navigate_tab,
             show_tab,
             resize_tabs,
             tab_action,
+            zoom_tab,
             devtools::devtools_action,
+            extensions::extension_action,
+            extensions::choose_extension_folder,
+            find::find_in_page,
             site_events::download_action,
+            site_events::download_history,
             site_events::tab_preview,
-            search::search_web
+            search::search_web,
         ])
         .run(tauri::generate_context!())
         .expect("Não foi possível iniciar o Orla Browser");

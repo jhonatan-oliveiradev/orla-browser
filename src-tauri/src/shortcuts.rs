@@ -7,7 +7,7 @@ use webview2_com::{
     },
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, VK_CONTROL, VK_F12, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    GetKeyState, VK_CONTROL, VK_F12, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, VK_TAB,
 };
 
 use crate::{as_message, CommandResult, SHELL};
@@ -40,6 +40,11 @@ pub fn attach(view: &Webview) -> CommandResult {
             let action = match (key, pressed(VK_CONTROL), pressed(VK_SHIFT)) {
                 (key, false, false) if key == u32::from(VK_F12) => "devtools",
                 (0x49, true, true) => "devtools",
+                (key, true, shift) if key == u32::from(VK_TAB) => if shift { "previous-tab" } else { "next-tab" },
+                (0xbb | 0x6b, true, _) => "zoom-in",
+                (0xbd | 0x6d, true, _) => "zoom-out",
+                (0x30 | 0x60, true, false) => "zoom-reset",
+                (0x46, true, false) => "find",
                 (0x4c, true, false) => "address",
                 (0x54, true, false) => "new-tab",
                 (0x54, true, true) => "reopen-tab",
@@ -54,7 +59,7 @@ pub fn attach(view: &Webview) -> CommandResult {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 if let Some(shell) = app.get_webview(SHELL) {
-                    let _ = shell.set_focus();
+                    if !action.starts_with("zoom-") { let _ = shell.set_focus(); }
                     let _ = app.emit_to(SHELL, "orla-shortcut", action);
                 }
             });
