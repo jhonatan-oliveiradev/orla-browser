@@ -1,3 +1,4 @@
+import { readClips } from './clips.js';
 import { readSplit } from './split.js';
 import { readAppearance } from './appearance.js';
 import { sidebarWidth } from './sidebar.js';
@@ -73,8 +74,9 @@ export function readSavedProject(value) {
   const name = workspaceName(value?.name);
   if (!name || !Number.isSafeInteger(value.savedAt) || value.savedAt < 1 || value.savedAt > 8_640_000_000_000_000) return null;
   const group = readTabGroup(value);
-  if (!group.tabs.some(Boolean) && !group.queries.some(Boolean) && !workspaceNotes(value.notes).trim()) return null;
-  return { name, savedAt: value.savedAt, notes: workspaceNotes(value.notes), ...group, pinnedIndices: [...group.pinnedIndices] };
+  const clips = readClips(value.clips);
+  if (!clips.length && !group.tabs.some(Boolean) && !group.queries.some(Boolean) && !workspaceNotes(value.notes).trim()) return null;
+  return { name, savedAt: value.savedAt, notes: workspaceNotes(value.notes), ...(clips.length ? { clips } : {}), ...group, pinnedIndices: [...group.pinnedIndices] };
 }
 
 function parseSnapshot(serialized) {
@@ -121,6 +123,7 @@ export function readSession(serialized, legacyNote, backup) {
         } : {}),
         ...(readProfile(entry.profile) ? { profile: readProfile(entry.profile) } : {}),
         ...(Array.isArray(entry.reading) ? { reading: readReadingList(entry.reading) } : {}),
+        ...(Array.isArray(entry.clips) ? { clips: readClips(entry.clips) } : {}),
         ...readTabGroup(entry),
       });
     }

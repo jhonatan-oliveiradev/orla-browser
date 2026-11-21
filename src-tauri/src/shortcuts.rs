@@ -52,6 +52,7 @@ pub fn attach(view: &Webview) -> CommandResult {
                 (0xbb | 0x6b, true, _) => "zoom-in",
                 (0xbd | 0x6d, true, _) => "zoom-out",
                 (0x30 | 0x60, true, false) => "zoom-reset",
+                (0x59, true, true) => "capture",
                 (0x4b, true, true) => "quick-tabs",
                 (0x4e, true, true) => "private",
                 (0x46, true, false) => "find",
@@ -69,7 +70,7 @@ pub fn attach(view: &Webview) -> CommandResult {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 if let Some(shell) = app.get_webview(SHELL) {
-                    if !action.starts_with("zoom-") { let _ = shell.set_focus(); }
+                    if action != "capture" && !action.starts_with("zoom-") { let _ = shell.set_focus(); }
                     let _ = app.emit_to(SHELL, "orla-shortcut", serde_json::json!({ "action": action, "id": id }));
                 }
             });

@@ -101,6 +101,24 @@
       await until('A extensão não foi executada na página.', async () => (
         await evaluatePage('document.documentElement.dataset.orlaSmoke')
       ).text === 'loaded');
+      await evaluatePage(`(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector('main p'));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      })()`);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, shiftKey: true, bubbles: true }));
+      await until('A seleção não chegou à captura.', () => get('#clip-dialog').open && get('#clip-text').value === 'marcador');
+      fill('#clip-note', 'Anotação para a pesquisa');
+      get('#clip-form').requestSubmit();
+      await until('A captura não foi salva.', () => !get('#clip-dialog').open);
+      click('#quick-tabs-toggle');
+      await until('A busca rápida não abriu.', () => get('#quick-tabs').open);
+      fill('#quick-tabs-query', 'anotacao pesquisa');
+      await until('A captura não apareceu na busca rápida.', () => contains('#quick-tabs-results', 'Captura'));
+      get('#quick-tabs').close();
+      await delay(250);
       await evaluatePage("document.cookie = 'orla_profile=regular; path=/'");
       await until('O cookie do perfil padrão não foi criado.', async () => (await evaluatePage('document.cookie')).text.includes('orla_profile=regular'));
       await evaluatePage('document.getElementById("download").click()');

@@ -1,3 +1,4 @@
+import { CLIP_LIMIT, initClips } from './clips.js';
 import { bindSplit } from './split.js';
 import { initQuickTabs } from './quick-tabs.js';
 import { initReader } from './reader.js';
@@ -94,8 +95,8 @@ async function invoke(command, args = {}) {
   return tauri.core.invoke(command, args);
 }
 
-function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [], split, profile = null, reading = [] }) {
-  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed, profile, reading,
+function mountWorkspace({ id, name, notes = '', tabs: urls = [''], queries = [], pinnedIndices = [], activeIndex = 0, recentlyClosed = [], split, profile = null, reading = [], clips = [] }) {
+  const workspace = { id, name, notes, activeId: nextId + activeIndex, recentlyClosed, profile, reading, clips,
     split: split ? { left: nextId + split.left, right: nextId + split.right, ratio: split.ratio } : null };
 
   workspaces.set(id, workspace);
@@ -132,8 +133,8 @@ function saveSession() {
     const groups = new Map([...workspaces.keys()].map((id) => [id, []]));
     for (const [id, tab] of tabs) groups.get(tab.workspaceId).push([id, tab]);
     saveSnapshot(localStorage, {
-      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed, split, profile, reading }) => ({
-        id, name, notes, recentlyClosed, profile, reading, ...serializeTabs(groups.get(id), activeId, split),
+      workspaces: [...workspaces.values()].map(({ id, name, notes, activeId, recentlyClosed, split, profile, reading, clips }) => ({
+        id, name, notes, recentlyClosed, profile, reading, clips, ...serializeTabs(groups.get(id), activeId, split),
       })),
       projects,
       activeWorkspaceId: activeWorkspace.id,
@@ -279,6 +280,7 @@ function orderedTabs() {
 }
 
 function renderResume() {
+  clipControls.render(activeWorkspace);
   renderReadingList();
   const open = byId('resume-open');
   const closed = byId('resume-closed');
@@ -920,7 +922,7 @@ const workspaceControls = initWorkspaces({
     spaces: workspaceOptions(),
     activeId: activeWorkspace.id,
     canMove: hasContent(tabs.get(activeWorkspace.activeId)),
-    canRemove: workspaces.size > 1 && !activeWorkspace.notes.trim() && !activeWorkspace.reading.length && workspaceTabs().every(([, tab]) => !hasContent(tab)),
+    canRemove: workspaces.size > 1 && !activeWorkspace.notes.trim() && !activeWorkspace.reading.length && !activeWorkspace.clips.length && workspaceTabs().every(([, tab]) => !hasContent(tab)),
   }),
   select: (id) => schedule(() => {
     const workspace = workspaces.get(id);
@@ -942,7 +944,7 @@ const workspaceControls = initWorkspaces({
   remove: () => schedule(() => {
     const target = [...workspaces.values()].find((workspace) => workspace !== activeWorkspace);
     const entries = workspaceTabs();
-    if (!target || activeWorkspace.notes.trim() || activeWorkspace.reading.length || entries.some(([, tab]) => hasContent(tab))) return;
+    if (!target || activeWorkspace.notes.trim() || activeWorkspace.reading.length || activeWorkspace.clips.length || entries.some(([, tab]) => hasContent(tab))) return;
     for (const [id] of entries) tabs.delete(id);
     workspaces.delete(activeWorkspace.id);
     switchWorkspace(target);
@@ -976,10 +978,10 @@ const projectControls = initProjects({
   save: (name) => {
     const entries = workspaceTabs().filter(([, tab]) => hasContent(tab));
     const project = readSavedProject({
-      name, savedAt: Date.now(), notes: activeWorkspace.notes,
+      name, savedAt: Date.now(), notes: activeWorkspace.notes, clips: activeWorkspace.clips,
       ...serializeTabs(entries, activeWorkspace.activeId, activeWorkspace.split),
     });
-    if (!project) return 'Abra uma página ou escreva uma nota antes de salvar a sessão.';
+    if (!project) return 'Abra uma página, escreva uma nota ou crie uma captura antes de salvar a sessão.';
     return addProject(project) || 'Não foi possível gravar a sessão neste dispositivo.';
   },
   restore: (project) => schedule(async () => {
@@ -1208,18 +1210,73 @@ address.addEventListener('keydown', (event) => {
   address.select();
 });
 
+const clipControls = initClips({
+  open: openDialog,
+  save: (workspace, item) => {
+    if (workspaces.get(workspace.id) !== workspace) return 'O espaço não está disponível.';
+    const previous = workspace.clips;
+    if (!item.id && previous.length >= CLIP_LIMIT) return 'O espaço chegou ao limite de 60 capturas.';
+    workspace.clips = item.id
+      ? previous.map((old) => old.id === item.id ? item : old)
+      : [{ ...item, id: crypto.randomUUID() }, ...previous];
+    if (saveSession()) return;
+    workspace.clips = previous;
+    return 'Não foi possível salvar a captura neste dispositivo.';
+  },
+  remove: (workspace, id) => {
+    const previous = workspace.clips;
+    workspace.clips = previous.filter((item) => item.id !== id);
+    if (saveSession()) return true;
+    workspace.clips = previous;
+    return false;
+  },
+  navigate: (workspace, url) => schedule(() => {
+    if (workspaces.get(workspace.id) !== workspace) return;
+    if (workspace !== activeWorkspace) switchWorkspace(workspace);
+    const existing = workspaceTabs(workspace).find(([, tab]) => tab.url === url);
+    return existing ? selectTab(existing[0]) : openTab(url);
+  }),
+});
+
+async function capturePage() {
+  const workspace = activeWorkspace;
+  const id = workspace.activeId;
+  const tab = tabs.get(id);
+  if (!tab?.url || !tab.loaded || tab.failure) return;
+  const { url } = tab;
+  try {
+    const selection = await invoke('page_selection', { id });
+    if (workspace !== activeWorkspace || workspace.activeId !== id || websiteAddress(selection?.url) !== url) {
+      throw new Error('A página mudou durante a captura. Tente novamente.');
+    }
+    byId('page-dialog').close();
+    clipControls.edit(workspace, { url, title: tab.title || new URL(url).hostname, text: selection.text });
+  } catch (error) {
+    if (byId('page-dialog').open) byId('page-options-status').textContent = String(error.message ?? error);
+    else showError(error);
+  }
+}
+
+byId('page-capture').addEventListener('click', () => schedule(capturePage));
+
 const openQuickTabs = initQuickTabs(openDialog, () => {
   const spaces = [activeWorkspace, ...[...workspaces.values()].filter((workspace) => workspace !== activeWorkspace)];
   return spaces.flatMap((workspace) => [
     { title: workspace.name, workspaceId: workspace.id },
+    ...workspace.clips.map((clip) => ({
+      clip, title: clip.title, url: clip.url, workspace: workspace.name, workspaceId: workspace.id,
+      searchText: clip.text + ' ' + clip.note,
+    })),
     ...workspaceTabs(workspace).map(([id, tab]) => ({
       id, workspaceId: workspace.id, workspace: workspace.name, url: tab.url,
       title: tab.title || (tab.url ? new URL(tab.url).hostname : tab.webSearch?.query || 'Nova aba'),
     })),
   ]);
-}, ({ id, workspaceId }) => schedule(async () => {
+}, ({ id, workspaceId, clip }) => schedule(async () => {
   const workspace = workspaces.get(workspaceId);
-  if (workspace) await selectTab(id ?? workspace.activeId);
+  if (!workspace) return;
+  if (clip) clipControls.edit(workspace, clip);
+  else await selectTab(id ?? workspace.activeId);
 }));
 byId('quick-tabs-toggle').addEventListener('click', openQuickTabs);
 
@@ -1280,6 +1337,10 @@ initBookmarks(favorites, bookmarkFolders, folders, () => {
 function runShortcut(action) {
   if (document.querySelector('dialog[open]')) return false;
   switch (action) {
+    case 'capture':
+      if (!tabs.get(activeWorkspace.activeId)?.url) return false;
+      schedule(capturePage);
+      return true;
     case 'quick-tabs': openQuickTabs(); return true;
     case 'private': schedule(openPrivate); return true;
     case 'find':
@@ -1323,7 +1384,7 @@ document.addEventListener('keydown', (event) => {
   if (!event.ctrlKey || event.repeat) return;
   const key = event.key.toLowerCase();
   const action = ({ '+': 'zoom-in', '=': 'zoom-in', '-': 'zoom-out' })[key] || (event.shiftKey
-    ? { t: 'reopen-tab', tab: 'previous-tab', k: 'quick-tabs', n: 'private' }
+    ? { t: 'reopen-tab', tab: 'previous-tab', k: 'quick-tabs', n: 'private', y: 'capture' }
     : { f: 'find', l: 'address', t: 'new-tab', w: 'close-tab', tab: 'next-tab', '0': 'zoom-reset' })[key];
   if (runShortcut(action)) event.preventDefault();
 });
