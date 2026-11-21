@@ -7,7 +7,7 @@ import { CoastArt } from './coast-art';
 import type { KeyboardEvent, PointerEvent } from 'react';
 
 const modes = [
-  { id: 'espacos', title: 'Espaços de trabalho', short: 'Espaços', icon: LayoutGrid, headline: 'Um lugar para cada projeto.', detail: 'Separe as abas de cada projeto e volte com tudo no lugar.' },
+  { id: 'espacos', title: 'Espaços de trabalho', short: 'Espaços', icon: LayoutGrid, headline: 'Passe de um projeto a outro.', detail: 'Separe as abas de cada projeto e volte com tudo no lugar.' },
   { id: 'dividir', title: 'Tela dividida', short: 'Dividir', icon: Columns2, headline: 'Duas páginas, lado a lado.', detail: 'Compare duas páginas na mesma janela. Arraste o divisor para ajustar a largura.' },
   { id: 'capturas', title: 'Capturas', short: 'Capturas', icon: Bookmark, headline: 'Guarde o que vale a pena rever.', detail: 'Busque nos trechos e links que você guardou no espaço.' },
 ] as const;
@@ -63,7 +63,26 @@ export function WorkspaceDemo() {
     };
   }, [mode, tour]);
 
+  useEffect(() => {
+    function syncChapterLink() {
+      const chapter = modes.find(({ id }) => window.location.hash === `#mode-${id}`);
+      if (!chapter) return;
+      setMode(chapter.id);
+      setTour('idle');
+    }
+    syncChapterLink();
+    window.addEventListener('hashchange', syncChapterLink);
+    return () => window.removeEventListener('hashchange', syncChapterLink);
+  }, []);
+
+  function clearChapterLink() {
+    if (modes.some(({ id }) => window.location.hash === `#mode-${id}`)) {
+      window.history.replaceState(window.history.state, '', '#demo');
+    }
+  }
+
   function selectMode(next: Mode) {
+    clearChapterLink();
     setTour('idle');
     setMode(next);
   }
@@ -74,6 +93,7 @@ export function WorkspaceDemo() {
       return;
     }
     if (tour === 'idle') {
+      clearChapterLink();
       setMode(modes[0].id);
       setSpace(0);
       setTab(0);
