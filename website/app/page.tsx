@@ -1,5 +1,4 @@
-import { ArrowDown, ArrowDownRight, ArrowUpRight, Braces, Command, Download, Layers3, Plus } from 'lucide-react';
-import { HeroScene } from '../components/hero-scene';
+import { ArrowDown, ArrowUpRight, Braces, Command, Download, Layers3, Plus } from 'lucide-react';
 import { WorkspaceDemo } from '../components/workspace-demo';
 
 const repository = 'https://github.com/jhonatan-oliveiradev/orla-browser';
@@ -25,37 +24,30 @@ export default function Home() {
           <nav aria-label="Navegação principal" className="nav-links flex items-center">
             <a href="#demo">Demonstração</a><a href="#recursos">Recursos</a>
           </nav>
-          <a href="#baixar" className="header-cta inline-flex items-center gap-2">Baixar <ArrowDownRight size={15} /></a>
+          <a href="#baixar" className="header-cta inline-flex items-center gap-2">Baixar <Download size={15} /></a>
         </div>
       </header>
       <main id="conteudo">
-        <section className="hero">
-          <HeroScene />
-          <div className="shell hero-inner">
-            <p className="hero-label"><span /> Navegador para Windows</p>
-            <h1>Sua web tem<br /><em>espaço.</em></h1>
-            <p className="hero-description">Pesquisa, trabalho, coisas pra ver depois. Cada ideia no seu espaço, com as abas e referências que pertencem a ela.</p>
-            <div className="hero-actions flex flex-wrap items-center gap-x-6 gap-y-4">
-              <a className="primary-button inline-flex items-center gap-2.5" href="#baixar"><Download size={17} /> Baixar para Windows</a>
-              <a className="demo-link inline-flex items-center gap-2" href="#demo">Explorar o Orla <ArrowDown size={15} /></a>
+        <section className="hero shell" aria-labelledby="hero-title">
+          <div>
+            <p className="hero-label"><span /> Prévia para Windows</p>
+            <h1 id="hero-title">Abra espaço<br /> para suas <em>ideias.</em></h1>
+          </div>
+          <div className="hero-aside">
+            <p>O navegador para quem trabalha com muitas abas. Dê a cada projeto um espaço com suas páginas, notas e referências.</p>
+            <div className="hero-actions">
+              <a className="primary-button inline-flex items-center gap-2" href="#baixar"><Download size={17} /> Baixar para Windows</a>
+              <a className="demo-link inline-flex items-center gap-2" href="#demo">Testar a demonstração <ArrowDown size={15} /></a>
             </div>
           </div>
-          <span className="hero-edge" aria-hidden="true" />
         </section>
-        <section className="product" id="demo" aria-labelledby="demo-title">
-          <div className="shell product-inner">
-            <div className="product-heading">
-              <p className="kicker"><Layers3 size={16} /> Demonstração interativa</p>
-              <h2 id="demo-title">Da primeira aba<br /> à próxima ideia.</h2>
-              <p>Troque de espaço, compare duas páginas ou encontre o que você guardou. Experimente com um projeto de exemplo.</p>
-            </div>
-            <WorkspaceDemo />
-          </div>
+        <section className="product shell" id="demo" aria-label="Demonstração interativa do Orla">
+          <WorkspaceDemo />
         </section>
         <section id="recursos" className="features" aria-labelledby="features-title">
           <div className="shell">
             <div className="features-heading">
-              <h2 id="features-title">Seu trabalho tem<br />continuação.</h2>
+              <h2 id="features-title">Tudo no lugar<br /> quando você voltar.</h2>
             </div>
             <div className="feature-list">
               <article><Layers3 /><h3>Retome de onde parou</h3><p>Salve as abas e notas de um espaço. Reabra a sessão quando voltar ao projeto ou exporte uma cópia em JSON.</p></article>

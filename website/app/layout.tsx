@@ -11,10 +11,10 @@ const manrope = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Orla Browser — Sua web tem espaço',
+  title: 'Orla Browser — Abra espaço para suas ideias',
   description: 'Um navegador para Windows que reúne abas, sessões e referências em espaços de trabalho. Explore a demonstração e baixe a prévia.',
   openGraph: {
-    title: 'Orla Browser — Sua web tem espaço',
+    title: 'Orla Browser — Abra espaço para suas ideias',
     description: 'Organize abas, sessões e referências em espaços de trabalho. Experimente o Orla para Windows.',
     type: 'website',
     locale: 'pt_BR',

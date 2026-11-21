@@ -14,4 +14,4 @@ Na Vercel, selecione o preset **Next.js** e configure `website` como **Root Dire
 
 O botão usa o artefato de prévia do Windows x64 no GitHub Actions. Configure `ORLA_DOWNLOAD_URL` e revise as instruções da página quando houver um instalador de distribuição pública.
 
-Os dados na demonstração são fictícios. A ilustração do hero é uma imagem local otimizada pelo Next.js. A refração em WebGL carrega em segundo plano em telas maiores com mouse. A imagem permanece visível em telas menores e quando o navegador desativa o efeito.
+A demonstração usa dados de exemplo e três cenas na mesma janela. Pode ser explorada por abas, teclado ou em um tour iniciado pelo visitante. O tour pausa quando a janela sai da tela, a guia fica oculta ou o visitante interage com a demonstração. A ilustração da costa é um SVG local. A preferência por movimento reduzido remove as transições entre as cenas.
