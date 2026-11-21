@@ -147,6 +147,9 @@
       await until('O divisor não mudou de posição.', () => get('#split-divider').getAttribute('aria-valuenow') === '54');
       click('#split-left-title');
       await until('O endereço da aba esquerda não foi selecionado.', () => get('#address').value.endsWith('/second'));
+      await window.__TAURI__.core.invoke('open_private');
+      window.orlaSmokePrivate = true;
+      await until('O teste da janela privada não respondeu.', () => window.orlaSmokePrivatePassed);
 
     }
     if (get('#widget-notes').value !== 'Nota de teste do Orla') throw new Error('A nota do espaço ficou indisponível.');

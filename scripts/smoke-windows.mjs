@@ -70,7 +70,7 @@ async function run(phase) {
 try {
   await run('exercise');
   await run('verify');
-  console.log('Passou: busca nativa, DevTools, extensão, tela dividida, leitura, cookies isolados e persistência de abas, notas e downloads.');
+  console.log('Passou: busca nativa, DevTools, extensão, tela dividida, leitura, cookies isolados, janela privada e persistência de abas, notas e downloads.');
 } finally {
   fixture.close();
   await rm(scratch, { recursive: true, force: true });
