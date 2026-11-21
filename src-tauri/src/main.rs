@@ -13,6 +13,8 @@ mod shortcuts;
 #[cfg(windows)]
 mod site_events;
 mod search;
+mod private;
+mod reader;
 
 use serde::Serialize;
 use tauri::{
@@ -47,7 +49,7 @@ fn website(url: &Url) -> bool {
         && url.host_str().is_some()
         && url.username().is_empty()
         && url.password().is_none()
-        && !matches!(url.host_str(), Some("tauri.localhost" | "ipc.localhost"))
+        && !matches!(url.host_str().map(|host| host.trim_end_matches('.')), Some("tauri.localhost" | "ipc.localhost"))
 }
 
 fn as_message(error: tauri::Error) -> String {
@@ -89,7 +91,7 @@ fn tab_label(id: u32) -> String {
 
 #[tauri::command]
 async fn navigate_tab(
-    caller: Webview, app: AppHandle, id: u32, address: String, viewport: Viewport,
+    caller: Webview, app: AppHandle, id: u32, address: String, viewport: Viewport, profile: Option<String>,
 ) -> CommandResult {
     ui_only(&caller)?;
     let url = Url::parse(&address).map_err(|_| "Endereço inválido.".to_string())?;
@@ -122,55 +124,59 @@ async fn navigate_tab(
             }
         });
     #[cfg(windows)]
-    let builder = extensions::site_profile(builder, &app)?;
+    let builder = extensions::site_profile(builder, &app, profile.as_deref())?;
     let view = window.add_child(builder, bounds.position, bounds.size).map_err(as_message)?;
     #[cfg(windows)]
     {
         shortcuts::attach(&view)?;
         site_events::attach(&view)?;
     }
+    view.hide().map_err(as_message)?;
     view.navigate(url).map_err(as_message)
+}
+
+#[derive(serde::Deserialize)]
+struct VisibleTab {
+    id: u32,
+    viewport: Viewport,
 }
 
 #[tauri::command]
 async fn show_tab(
     caller: Webview, app: AppHandle, id: Option<u32>, focus: Option<bool>, viewport: Option<Viewport>,
+    panes: Option<Vec<VisibleTab>>,
 ) -> CommandResult {
     ui_only(&caller)?;
-    let active = id.map(tab_label);
+    let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
+    let panes = panes.unwrap_or_else(|| id.zip(viewport).map(|(id, viewport)| VisibleTab { id, viewport }).into_iter().collect());
+    let visible = panes.iter().take(2).map(|pane| (tab_label(pane.id), &pane.viewport)).collect::<Vec<_>>();
     for (label, view) in app.webviews() {
-        if label.starts_with("tab-") && Some(&label) != active.as_ref() {
+        if label.starts_with("tab-") && !visible.iter().any(|(shown, _)| shown == &label) {
             view.hide().map_err(as_message)?;
         }
     }
-    if id.is_none() && focus == Some(true) {
-        if let Some(shell) = app.get_webview(SHELL) {
-            shell.set_focus().map_err(as_message)?;
+    for (label, viewport) in visible {
+        if let Some(view) = app.get_webview(&label) {
+            view.set_bounds(viewport.bounds(&window)?).map_err(as_message)?;
+            view.show().map_err(as_message)?;
         }
     }
-    if let Some(view) = active.and_then(|label| app.get_webview(&label)) {
-        if let Some(viewport) = viewport {
-            let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
-            view.set_bounds(viewport.bounds(&window)?).map_err(as_message)?;
-        }
-        view.show().map_err(as_message)?;
-        if focus == Some(true) {
-            view.set_focus().map_err(as_message)?;
-        }
+    if focus == Some(true) {
+        let label = id.map(tab_label).unwrap_or_else(|| SHELL.to_owned());
+        if let Some(view) = app.get_webview(&label) { view.set_focus().map_err(as_message)?; }
     }
     Ok(())
 }
 
 #[tauri::command]
 async fn resize_tabs(
-    caller: Webview, app: AppHandle, viewport: Viewport,
+    caller: Webview, app: AppHandle, panes: Vec<VisibleTab>,
 ) -> CommandResult {
     ui_only(&caller)?;
     let window = app.get_window(SHELL).ok_or("Janela indisponível.")?;
-    let bounds = viewport.bounds(&window)?;
-    for (label, view) in app.webviews() {
-        if label.starts_with("tab-") {
-            view.set_bounds(bounds).map_err(as_message)?;
+    for pane in panes.into_iter().take(2) {
+        if let Some(view) = app.get_webview(&tab_label(pane.id)) {
+            view.set_bounds(pane.viewport.bounds(&window)?).map_err(as_message)?;
         }
     }
     Ok(())
@@ -257,6 +263,9 @@ fn main() {
     let app = app.setup(smoke::setup);
     app.invoke_handler(tauri::generate_handler![
             navigate_tab,
+            private::open_private,
+            private::private_page,
+            reader::read_page,
             show_tab,
             resize_tabs,
             tab_action,

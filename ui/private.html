@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="grafite">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Orla · Janela privada</title><link rel="stylesheet" href="orla.css"><script type="module" src="private.js"></script></head>
+<body class="private-window">
+  <header class="toolbar" aria-label="Navegação privada">
+    <span class="private-label">Privada</span>
+    <button type="button" class="icon" data-private-action="back" aria-label="Voltar">‹</button>
+    <button type="button" class="icon" data-private-action="forward" aria-label="Avançar">›</button>
+    <button type="button" class="icon" data-private-action="reload" aria-label="Recarregar">↻</button>
+    <form id="private-form" class="address"><input id="private-address" type="text" aria-label="Pesquisar ou digitar endereço" placeholder="Pesquisar ou digitar endereço" autocomplete="off" autofocus><kbd>Enter</kbd></form>
+  </header>
+  <main id="private-stage"><h1>Janela privada</h1><p>As páginas visitadas aqui ficam fora do histórico e das sessões do Orla.</p></main>
+  <p id="private-status" role="status" hidden></p>
+</body>
+</html>

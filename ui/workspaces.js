@@ -6,6 +6,7 @@ export function initWorkspaces({ open, getState, select, create, rename, move, r
   const dialog = byId('workspaces-dialog');
   const list = byId('workspaces-list');
   const createInput = byId('workspace-create-name');
+  const isolated = byId('workspace-isolated');
   const renameInput = byId('workspace-rename-name');
   const moveForm = byId('workspace-move-form');
   const target = byId('workspace-move-target');
@@ -22,7 +23,7 @@ export function initWorkspaces({ open, getState, select, create, rename, move, r
     const { spaces, activeId, canMove, canRemove } = getState();
     list.replaceChildren();
     target.replaceChildren();
-    for (const { id, name, count } of spaces) {
+    for (const { id, name, count, profile } of spaces) {
       const row = document.createElement('li');
       const button = document.createElement('button');
       button.type = 'button';
@@ -30,6 +31,7 @@ export function initWorkspaces({ open, getState, select, create, rename, move, r
       title.textContent = name;
       const detail = document.createElement('small');
       detail.textContent = id === activeId ? 'Atual' : count === 1 ? '1 aba' : count + ' abas';
+      if (profile) detail.textContent += ' · Perfil separado';
       if (id === activeId) {
         button.setAttribute('aria-current', 'true');
         renameInput.value = name;
@@ -48,6 +50,7 @@ export function initWorkspaces({ open, getState, select, create, rename, move, r
 
   toggle.addEventListener('click', () => {
     createInput.value = '';
+    isolated.checked = false;
     createInput.setCustomValidity('');
     renameInput.setCustomValidity('');
     renderDialog();
@@ -67,7 +70,7 @@ export function initWorkspaces({ open, getState, select, create, rename, move, r
     input.addEventListener('input', () => input.setCustomValidity(''));
   }
 
-  bindName('workspace-create-form', createInput, create);
+  bindName('workspace-create-form', createInput, (name) => create(name, isolated.checked));
   bindName('workspace-rename-form', renameInput, rename);
   moveForm.addEventListener('submit', (event) => {
     event.preventDefault();

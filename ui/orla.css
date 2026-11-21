@@ -678,3 +678,42 @@ dialog :is(input, select, button):focus-visible, #find-bar :is(input, button):fo
 .tab-dialog-actions kbd { color: var(--muted); }
 #tab-menu-move-form[hidden] { display: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+
+#site-viewport { position: relative; }
+#split-view { display: grid; position: absolute; inset: 0; grid-template-columns: minmax(0,var(--split-left, 50%)) 8px minmax(0,1fr); background: var(--toolbar); }
+#split-view[hidden] { display: none; }
+.split-pane { display: grid; grid-template-rows: 32px minmax(0,1fr); min-width: 0; }
+.split-pane-heading { display: flex; min-width: 0; }
+.split-pane button { min-width: 0; font-size: 12px; color: var(--muted); }
+.split-pane [id$="-title"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; padding-inline: 9px; flex: 1; }
+.split-pane [aria-current="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); background: var(--active-surface); }
+#split-divider { cursor: col-resize; touch-action: none; background: var(--line); }
+#split-divider:hover, #split-divider:focus-visible { background: var(--accent); outline-offset: -2px; }
+#quick-tabs, #bookmarks-dialog { width: min(600px, 92vw); }
+#quick-tabs-results, #bookmarks-tree { list-style: none; padding: 0; margin-block: 10px; max-height: 50dvh; overflow: auto; }
+#quick-tabs-results button { display: grid; text-align: start; width: 100%; gap: 2px; overflow-wrap: anywhere; }
+#quick-tabs-results small, #bookmarks-tree small { color: var(--muted); }
+#quick-tabs-query, #bookmark-editor :is(input,select), .reader-controls select { color: var(--text); background: var(--graphite); border: 1px solid var(--line); border-radius: 6px; padding: 7px; }
+#quick-tabs-query, #bookmark-editor :is(input,select) { width: 100%; }
+.library-actions, .reader-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+#bookmarks-tree li { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding-inline-start: calc(var(--folder-depth, 0) * 10px); }
+#bookmarks-tree li > :first-child { min-width: 0; overflow-wrap: anywhere; text-align: start; }
+#bookmarks-tree li > :last-child { flex: none; }
+#bookmark-editor[hidden] { display: none; }
+#bookmark-editor label { display: block; margin-top: 6px; }
+#reader-dialog { width: min(950px, 94vw); }
+#reader-content { max-width: 65ch; margin: 16px auto; padding-inline: 4px; font: 18px/1.65 Georgia, serif; overflow-wrap: anywhere; }
+#reader-content[data-size="small"] { font-size: 16px; }
+#reader-content[data-size="large"] { font-size: 21px; }
+#reader-content[data-font="sans"] { font-family: system-ui, sans-serif; }
+#reader-content[data-width="narrow"] { max-width: 50ch; }
+#reader-content[data-width="wide"] { max-width: 78ch; }
+#reader-content :is(h3,p) { color: var(--text); }
+#reader-content h3 { font-size: 1.6em; line-height: 1.2; }
+.private-window { --toolbar-height: 57px; }
+.private-window .toolbar { flex-wrap: nowrap; }
+.private-window .toolbar .address { flex: 1 1 auto; order: 0; }
+.private-label { color: var(--accent); font-weight: 650; }
+#private-stage { margin: 6px; height: calc(100dvh - 69px); padding: 7vw; }
+#private-stage.private-loaded > * { display: none; }
+#private-status { position: fixed; top: 57px; left: 12px; background: var(--toolbar); color: var(--text); padding: 8px; }

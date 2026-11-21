@@ -61,3 +61,12 @@ No GitHub Actions, o workflow **Windows validation** executa os testes JavaScrip
 
 - Arraste uma aba pela barra lateral para reordená-la dentro do seu grupo. Com foco na aba, use **Alt+↑** ou **Alt+↓**. A ordem é restaurada ao reabrir o Orla.
 - Abra **Ações da aba** pelo botão ao lado dela, com o botão direito ou com **Shift+F10**. O menu permite fixar, duplicar, reordenar, mover para outro espaço ou fechar a aba. O botão do meio também fecha a aba.
+
+### Trabalhe em dois sites e separe suas contas
+
+- Com uma página aberta, abra as ações de outra aba do mesmo espaço e selecione **Abrir lado a lado**. Clique em um painel para direcionar o endereço, **Ctrl+F** e **F12** para ele. Arraste ou use as setas no divisor. O par e a largura voltam ao reabrir o espaço.
+- Use **Ctrl+Shift+K** ou a lupa da barra para encontrar abas e espaços por nome ou endereço.
+- Em **Favoritos → Gerenciar**, crie e renomeie pastas, mova favoritos e subpastas e exporte para o formato HTML de favoritos. A importação HTML preserva a hierarquia.
+- Nas ações da página, use **Modo de leitura** para simplificar artigos com texto detectável e ajustar fonte, tamanho e largura. **Salvar para ler depois** guarda o endereço em **Retomar**, no espaço atual.
+- Ao criar um espaço, marque **Usar perfil de navegação separado** para ter cookies e logins próprios. Mover uma aba entre perfis recarrega a página no destino. As extensões do perfil padrão não são carregadas nesses espaços.
+- Pressione **Ctrl+Shift+N** ou selecione **Nova janela privada** nos espaços. A janela oferece uma página e controles de navegação e mantém as visitas fora da sessão e do histórico do Orla. Arquivos baixados permanecem no dispositivo.

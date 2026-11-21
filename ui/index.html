@@ -21,6 +21,7 @@
       <kbd aria-hidden="true">Ctrl+L</kbd>
     </form>
     <div class="toolbar-tools">
+      <button id="quick-tabs-toggle" class="icon" type="button" aria-label="Encontrar aba ou espaço" title="Encontrar aba ou espaço (Ctrl+Shift+K)" data-static-icon="search"></button>
       <button id="page-options" class="icon" type="button" aria-label="Ações da página" title="Ações da página" aria-haspopup="dialog" aria-controls="page-dialog" disabled data-static-icon="more"></button>
       <button id="favorite-page" class="icon" aria-label="Favoritar página" aria-pressed="false" disabled></button>
       <button id="new-tab" class="icon" aria-label="Nova aba" title="Nova aba"><img src="assets/plus.svg" alt=""></button>
@@ -83,6 +84,11 @@
         </form>
       </div>
       <div id="site-viewport" class="site-viewport">
+        <section id="split-view" aria-label="Abas lado a lado" hidden>
+          <div class="split-pane"><button id="split-left-title" type="button"></button><div id="split-left"></div></div>
+          <div id="split-divider" role="separator" aria-orientation="vertical" aria-label="Largura do painel esquerdo" tabindex="0" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50"></div>
+          <div class="split-pane"><div class="split-pane-heading"><button id="split-right-title" type="button"></button><button id="split-close" type="button" class="icon" aria-label="Encerrar tela dividida" data-static-icon="close"></button></div><div id="split-right"></div></div>
+        </section>
         <main id="home">
           <div class="home-art" aria-hidden="true">
             <svg viewBox="0 0 567 670" preserveAspectRatio="none" focusable="false">
@@ -106,6 +112,7 @@
             <nav class="favorites" aria-label="Favoritos">
               <div class="collection-heading">
                 <p>Favoritos</p>
+                <button id="bookmarks-manage" type="button">Gerenciar</button>
                 <button id="bookmarks-import" type="button">Importar HTML</button>
               </div>
               <input id="bookmarks-file" type="file" accept=".html,.htm,text/html" hidden>
@@ -157,6 +164,11 @@
                 <ul class="resume-list" id="resume-closed"></ul>
               </section>
             </div>
+            <section class="home-card" aria-labelledby="reading-list-title">
+              <h2 id="reading-list-title">Ler depois</h2>
+              <p id="reading-list-empty">Guarde páginas pelo menu de ações da página.</p>
+              <ul id="reading-list" class="resume-list"></ul>
+            </section>
             <section class="home-card history-card" aria-labelledby="history-title">
               <div class="history-heading">
                 <h2 id="history-title">Histórico</h2>
@@ -310,7 +322,9 @@
         <input id="workspace-create-name" placeholder="Ex. Trabalho" maxlength="40" required autocomplete="off">
         <button type="submit">Criar</button>
       </div>
+      <label><input id="workspace-isolated" type="checkbox"> Usar perfil de navegação separado</label>
     </form>
+    <button id="private-window" type="button">Nova janela privada</button>
     <form id="workspace-rename-form" class="workspace-form">
       <label for="workspace-rename-name">Nome do espaço atual</label>
       <div class="workspace-fields">
@@ -327,7 +341,7 @@
     </form>
     <button id="workspace-save-project" type="button" aria-haspopup="dialog" aria-controls="project-save-dialog">Salvar sessão</button>
     <button id="workspace-remove" type="button" aria-describedby="workspace-remove-hint">Excluir espaço atual</button>
-    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem abas abertas e sem notas.</p>
+    <p id="workspace-remove-hint" hidden>Um espaço pode ser excluído quando estiver sem páginas abertas, notas ou itens de leitura.</p>
   </dialog>
   <dialog id="project-save-dialog" aria-labelledby="project-save-title">
     <h2 id="project-save-title">Salvar sessão</h2>
@@ -387,6 +401,31 @@
     <label class="setting-row"><span>Animar fundo da Nova Aba</span><input id="appearance-motion" type="checkbox" checked></label>
     <footer class="dialog-actions"><button id="settings-search" type="button">Provedor de busca</button></footer>
   </dialog>
+  <dialog id="quick-tabs" aria-labelledby="quick-tabs-title">
+    <header class="dialog-heading"><h2 id="quick-tabs-title">Encontrar aba ou espaço</h2><button class="icon" type="button" data-dismiss aria-label="Fechar busca" data-static-icon="close"></button></header>
+    <input id="quick-tabs-query" type="search" autocomplete="off" placeholder="Título, endereço ou espaço" aria-label="Buscar abas e espaços" autofocus>
+    <ul id="quick-tabs-results"></ul><p id="quick-tabs-empty" role="status" hidden>Nenhum resultado.</p>
+  </dialog>
+  <dialog id="bookmarks-dialog" aria-labelledby="bookmarks-heading">
+    <header class="dialog-heading"><h2 id="bookmarks-heading">Favoritos</h2><button class="icon" type="button" data-dismiss aria-label="Fechar favoritos" data-static-icon="close"></button></header>
+    <div class="library-actions"><button id="bookmarks-new-folder" type="button">Nova pasta</button><button id="bookmarks-export" type="button">Exportar HTML</button></div>
+    <ul id="bookmarks-tree"></ul>
+    <form id="bookmark-editor" class="workspace-form" hidden>
+      <label for="bookmark-name">Nome</label><input id="bookmark-name" maxlength="100" required>
+      <label for="bookmark-parent">Pasta de destino</label><select id="bookmark-parent"></select>
+      <div class="library-actions"><button type="submit" class="primary">Salvar</button><button id="bookmark-edit-cancel" type="button">Cancelar</button></div>
+    </form>
+    <p id="bookmark-editor-status" role="status"></p>
+  </dialog>
+  <dialog id="reader-dialog" aria-labelledby="reader-heading">
+    <header class="dialog-heading"><h2 id="reader-heading">Modo de leitura</h2><button class="icon" type="button" data-dismiss aria-label="Fechar leitura" data-static-icon="close"></button></header>
+    <div class="reader-controls">
+      <label>Fonte <select id="reader-font"><option value="serif">Serifada</option><option value="sans">Sem serifa</option></select></label>
+      <label>Tamanho <select id="reader-size"><option value="small">Menor</option><option selected value="normal">Normal</option><option value="large">Maior</option></select></label>
+      <label>Largura <select id="reader-width"><option value="narrow">Estreita</option><option selected value="normal">Normal</option><option value="wide">Ampla</option></select></label>
+    </div>
+    <p id="reader-status" role="status"></p><article id="reader-content"></article>
+  </dialog>
   <dialog id="tab-dialog" aria-labelledby="tab-dialog-heading" aria-describedby="tab-dialog-title">
     <header class="dialog-heading">
       <h2 id="tab-dialog-heading">Ações da aba</h2>
@@ -395,6 +434,7 @@
     <p id="tab-dialog-title" class="tab-dialog-title"></p>
     <div class="tab-dialog-actions">
       <button type="button" id="tab-menu-pin">Fixar aba</button>
+      <button type="button" id="tab-menu-split">Abrir lado a lado</button>
       <button type="button" id="tab-menu-duplicate">Duplicar aba</button>
       <button type="button" id="tab-menu-up">Mover para cima <kbd>Alt+↑</kbd></button>
       <button type="button" id="tab-menu-down">Mover para baixo <kbd>Alt+↓</kbd></button>
@@ -419,6 +459,8 @@
       <button type="button" id="page-zoom-reset" title="Restaurar zoom (Ctrl+0)" aria-label="Restaurar zoom">100%</button>
       <button type="button" id="page-zoom-in" aria-label="Aumentar zoom" title="Ctrl++">+</button>
     </div>
+    <button type="button" id="page-reader">Modo de leitura</button>
+    <button type="button" id="page-reading-save">Salvar para ler depois</button>
     <button type="button" id="page-duplicate">Duplicar aba</button>
     <button type="button" id="page-copy">Copiar endereço</button>
     <p id="page-options-status" class="collection-status" role="status"></p>

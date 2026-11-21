@@ -1,0 +1,6 @@
+{
+  "identifier": "orla-private",
+  "description": "Eventos da interface privada",
+  "webviews": ["orla-private"],
+  "permissions": ["core:event:allow-listen"]
+}
