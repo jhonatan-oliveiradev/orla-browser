@@ -13,6 +13,7 @@ const manrope = localFont({
 export const metadata: Metadata = {
   title: 'Orla Browser — Abra espaço para suas ideias',
   description: 'Um navegador para Windows que reúne abas, sessões e referências em espaços de trabalho. Explore a demonstração e baixe a prévia.',
+  other: { 'page-type': 'software', 'site-kind': 'software' },
   openGraph: {
     title: 'Orla Browser — Abra espaço para suas ideias',
     description: 'Organize abas, sessões e referências em espaços de trabalho. Experimente o Orla para Windows.',
@@ -22,5 +23,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="pt-BR" className={manrope.variable}><body>{children}</body></html>;
+  return <html lang="pt-BR" data-type="software" className={manrope.variable}><body>{children}</body></html>;
 }

@@ -1,4 +1,6 @@
-import { ArrowDown, ArrowUpRight, Braces, Command, Download, Layers3, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, Download, Plus } from 'lucide-react';
+import { FeatureCatalog } from '../components/feature-catalog';
+import { HeroChart } from '../components/hero-chart';
 import { WorkspaceDemo } from '../components/workspace-demo';
 
 const repository = 'https://github.com/jhonatan-oliveiradev/orla-browser';
@@ -28,32 +30,35 @@ export default function Home() {
         </div>
       </header>
       <main id="conteudo">
-        <section className="hero shell" aria-labelledby="hero-title">
-          <div>
-            <p className="hero-label"><span /> Prévia para Windows</p>
-            <h1 id="hero-title">Abra espaço<br /> para suas <em>ideias.</em></h1>
-          </div>
-          <div className="hero-aside">
-            <p>O navegador para quem trabalha com muitas abas. Dê a cada projeto um espaço com suas páginas, notas e referências.</p>
+        <section className="hero" aria-labelledby="hero-title" data-enter>
+          <HeroChart />
+          <div className="shell hero-content">
+            <span className="hero-wordmark" aria-hidden="true">ORLA<span>.</span></span>
+            <h1 id="hero-title">Um navegador para<br /> quem trabalha por projeto.</h1>
+            <p>Reúna abas, notas e referências em espaços que você pode retomar quando precisar.</p>
             <div className="hero-actions">
               <a className="primary-button inline-flex items-center gap-2" href="#baixar"><Download size={17} /> Baixar para Windows</a>
-              <a className="demo-link inline-flex items-center gap-2" href="#demo">Testar a demonstração <ArrowDown size={15} /></a>
+              <a className="demo-link inline-flex items-center gap-2" href="#demo">Testar o Orla <ArrowDown size={15} /></a>
             </div>
+            <p className="hero-label"><span /> Prévia para Windows x64</p>
           </div>
         </section>
-        <section className="product shell" id="demo" aria-label="Demonstração interativa do Orla">
-          <WorkspaceDemo />
+        <section className="product" id="demo" aria-labelledby="demo-title">
+          <div className="shell">
+            <div className="section-heading">
+              <h2 id="demo-title">Um lugar para<br /> cada <em>projeto.</em></h2>
+              <p>Experimente com as abas de um estúdio. Troque de espaço, abra duas páginas lado a lado ou encontre uma referência salva.</p>
+            </div>
+            <WorkspaceDemo />
+          </div>
         </section>
         <section id="recursos" className="features" aria-labelledby="features-title">
           <div className="shell">
-            <div className="features-heading">
-              <h2 id="features-title">Tudo no lugar<br /> quando você voltar.</h2>
+            <div className="section-heading">
+              <h2 id="features-title">O que vem<br /> no <em>Orla.</em></h2>
+              <p>Da primeira aba à próxima sessão, explore as ferramentas que cabem na mesma janela.</p>
             </div>
-            <div className="feature-list">
-              <article><Layers3 /><h3>Retome de onde parou</h3><p>Salve as abas e notas de um espaço. Reabra a sessão quando voltar ao projeto ou exporte uma cópia em JSON.</p></article>
-              <article><Command /><h3>Encontre uma aba pelo teclado</h3><p>Digite o nome de uma página ou de um espaço na barra de endereços. O Orla encontra o que já está aberto.</p></article>
-              <article><Braces /><h3>Inspecione sem sair da janela</h3><p>Use F12 para abrir as ferramentas de desenvolvimento e escolha onde encaixar o painel.</p></article>
-            </div>
+            <FeatureCatalog />
           </div>
         </section>
         <section className="install" id="baixar" aria-labelledby="install-title">
@@ -79,9 +84,12 @@ export default function Home() {
           </div>
         </section>
       </main>
-      <footer className="site-footer shell flex flex-wrap items-center justify-between gap-5">
-        <Brand />
-        <div className="flex items-center gap-5"><a href="#perguntas">Perguntas</a><a href={repository} className="inline-flex items-center gap-1">GitHub <ArrowUpRight size={15} /></a></div>
+      <footer className="site-footer">
+        <div className="shell footer-inner">
+          <div><Brand /><p>Navegador para Windows.</p></div>
+          <nav aria-label="Produto"><h2>Produto</h2><a href="#demo">Demonstração</a><a href="#recursos">Recursos</a><a href="#baixar">Baixar</a></nav>
+          <nav aria-label="Documentação"><h2>Documentação</h2><a href="#perguntas">Perguntas frequentes</a><a href={repository} className="inline-flex items-center gap-1">GitHub <ArrowUpRight size={14} /></a></nav>
+        </div>
       </footer>
     </>
   );
