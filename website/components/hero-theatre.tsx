@@ -2,7 +2,7 @@
 
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Bookmark,
-  Columns2, Command, Download, FolderOpen, Globe2, Layers3,
+  Columns2, Download, Globe2, Layers3,
   PanelLeft, Search,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -115,7 +115,7 @@ function CapturesView() {
   return <div className="showcase-captures">
     <div className="capture-heading"><span>Biblioteca de capturas</span><span>REFERÊNCIAS / ESTÚDIO</span></div>
     <h3>As boas ideias<br />não somem.</h3>
-    <div className="capture-search"><Search size={16} /><span>Buscar nas capturas...</span><kbd>Ctrl K</kbd></div>
+    <div className="capture-search"><Search size={16} /><span>Buscar nas capturas...</span></div>
     <div className="capture-grid">
       <div className="capture-tile"><span className="capture-tile-art capture-art-type"><strong>Aa</strong><small>Typography</small></span><span><Bookmark size={13} /> Escala tipográfica</span></div>
       <div className="capture-tile"><span className="capture-tile-art capture-art-color"><i /><i /><i /></span><span><Bookmark size={13} /> Contraste e cor</span></div>
@@ -177,7 +177,7 @@ export function HeroTheatre({ download }: { download: string }) {
             <div className="showcase-device">
               <div className="showcase-topbar">
                 <div className="showcase-top-left"><PanelLeft size={16} /><span className="showcase-top-spacer" /><ArrowLeft size={14} /><ArrowRight size={14} /></div>
-                <div className="showcase-address"><Search size={13} /><span>{scene === 'capturas' ? 'orla://capturas' : scene === 'dividir' ? 'orla://dividir' : 'orla://inicio'}</span><kbd>Ctrl L</kbd></div>
+                <div className="showcase-address"><Search size={13} /><span>{scene === 'capturas' ? 'Capturas' : scene === 'dividir' ? 'Duas páginas' : 'Nova aba'}</span><kbd>Ctrl L</kbd></div>
                 <div className="showcase-window-actions"><span>−</span><span>□</span><span>×</span></div>
               </div>
               <div className="showcase-main">
