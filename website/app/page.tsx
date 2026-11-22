@@ -1,7 +1,7 @@
 import { ArrowRight, ArrowUpRight, Download, Plus } from 'lucide-react';
 import { FeatureCatalog } from '../components/feature-catalog';
 import { Enter, ScrollTrack } from '../components/motion-scenes';
-import { HeroTheatre } from '../components/hero-theatre';
+import { OpeningExperience } from '../components/opening-experience';
 import { CoastEmblem } from '../components/coast-emblem';
 import { WorkspaceDemo } from '../components/workspace-demo';
 
@@ -44,7 +44,7 @@ export default function Home() {
       </header>
 
       <main id="conteudo">
-        <HeroTheatre download={download} />
+        <OpeningExperience download={download} />
 
         <section className="showcase-section" id="experimente" aria-labelledby="showcase-title">
           <div className="wide-shell">
