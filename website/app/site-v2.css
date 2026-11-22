@@ -758,3 +758,19 @@ html { scroll-padding-top: 100px; }
   .coast-emblem figcaption { padding-inline: 24px; font-size: 11px; }
   .interlude-bottom > p { max-width: 45ch; }
 }
+
+
+/* Quiet supporting chapter chrome; the product and the copy carry the hierarchy. */
+.showcase-heading { margin-top: 0; }
+.interlude-kicker { min-height: 1px; }
+.interlude-rule { width: 100%; }
+.feature-intro { margin-top: 0; }
+.feature-intro h2 { max-width: 15ch; text-wrap: balance; }
+.local-aside { justify-content: center; }
+.local-copy h2 { margin-top: 0; }
+.cta-content { margin-top: 0; }
+.questions-grid h2 { margin-top: 0; }
+@media (max-width: 620px) {
+  .feature-intro h2 { font-size: clamp(41px, 10.7vw, 66px); }
+  .local-copy h2 { margin-top: 0; }
+}
