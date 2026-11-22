@@ -298,3 +298,7 @@ body { background: var(--orla-bg); }
   .hero-scroll svg { animation: none; }
   .scroll-track { transition: none; }
 }
+
+/* Sticky navigation must not obscure in-page destinations. */
+html { scroll-padding-top: 100px; }
+@media (max-width: 620px) { html { scroll-padding-top: 78px; } }
