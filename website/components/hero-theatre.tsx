@@ -6,7 +6,7 @@ import {
   PanelLeft, Search,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { HorizonField } from './motion-scenes';
 
 type Scene = 'espacos' | 'dividir' | 'capturas';
@@ -71,7 +71,7 @@ function StudioArt({ space }: { space: Space }) {
 
 function SpacesView({ space }: { space: Space }) {
   const data = spaceData[space];
-  return <div className="showcase-home" style={{ '--space-color': data.accent } as React.CSSProperties}>
+  return <div className="showcase-home" style={{ '--space-color': data.accent } as CSSProperties}>
     <StudioArt space={space} />
     <div className="showcase-home-shade" />
     <div className="showcase-home-content">
