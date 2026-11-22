@@ -125,7 +125,7 @@ function CapturesView() {
   </div>;
 }
 
-export function HeroTheatre({ download }: { download: string }) {
+export function HeroTheatre({ download, revealed = true }: { download: string; revealed?: boolean }) {
   const sectionRef = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
   const [scene, setScene] = useState<Scene>('espacos');
@@ -135,10 +135,15 @@ export function HeroTheatre({ download }: { download: string }) {
   const tiltY = useTransform(scrollYProgress, [0, .8], [-9, 0]);
   const stageY = useTransform(scrollYProgress, [0, 1], [0, -36]);
   const activeScene = scenes.find((item) => item.id === scene)!;
+  const ready = revealed || Boolean(reduced);
+  const heroEase = [0.16, 1, 0.3, 1] as const;
 
   return (
     <section ref={sectionRef} id="inicio" className="cinematic-hero" aria-labelledby="hero-title">
-      <HorizonField />
+      {ready && <HorizonField />}
+      <motion.div className="hero-reveal-glow" aria-hidden="true" initial={false}
+        animate={{ opacity: ready ? 1 : 0, scale: ready ? 1 : .83 }}
+        transition={{ duration: 1.15, ease: heroEase }} />
       <div className="hero-vector-world" aria-hidden="true">
         <svg viewBox="0 0 1440 1000" fill="none" preserveAspectRatio="xMidYMid slice">
           <circle cx="1050" cy="472" r="355" stroke="#c4dc9b" strokeWidth=".8" strokeOpacity=".25" />
@@ -153,16 +158,19 @@ export function HeroTheatre({ download }: { download: string }) {
       </div>
       <div className="wide-shell hero-composition">
         <div className="hero-statement">
-          <motion.h1 id="hero-title" initial={reduced ? false : { opacity: 0, y: 42 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: .8, ease: [.16, 1, .3, 1] }}>
+          <motion.h1 id="hero-title" initial={false}
+            animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 30, filter: ready ? 'blur(0px)' : 'blur(7px)' }}
+            transition={{ duration: reduced ? 0 : .82, delay: ready ? .12 : 0, ease: heroEase }}>
             Você não trabalha<br />em abas.<br /><em>Trabalha em projetos.</em>
           </motion.h1>
-          <motion.p initial={reduced ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: .6, delay: .25, ease: [.16, 1, .3, 1] }}>
+          <motion.p initial={false}
+            animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 18 }}
+            transition={{ duration: reduced ? 0 : .68, delay: ready ? .28 : 0, ease: heroEase }}>
             Abas, sessões e referências organizadas por espaço de trabalho. Abra um projeto e continue de onde parou.
           </motion.p>
-          <motion.div className="hero-statement-actions" initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }}
-            transition={{ duration: .5, delay: .44 }}>
+          <motion.div className="hero-statement-actions" initial={false}
+            animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 12 }}
+            transition={{ duration: reduced ? 0 : .55, delay: ready ? .4 : 0, ease: heroEase }}>
             <a className="download-button" href={download} target="_blank" rel="noopener noreferrer">Baixar prévia <Download size={18} /></a>
             <a className="hero-explore" href="#experimente">Ver o Orla em ação <ArrowUpRight size={17} /></a>
           </motion.div>
@@ -171,9 +179,9 @@ export function HeroTheatre({ download }: { download: string }) {
         <div className="cinematic-stage">
           <div className="stage-coordinate stage-coordinate-top" aria-hidden="true">ORLA / WORKSPACE VIEW</div>
           <motion.div className="stage-perspective" style={reduced ? undefined : { rotateX: tiltX, rotateY: tiltY, y: stageY }}
-            initial={reduced ? false : { opacity: 0, scale: .94, x: 30 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            transition={{ duration: 1.2, delay: .16, ease: [.16, 1, .3, 1] }}>
+            initial={false}
+            animate={{ opacity: ready ? 1 : 0, scale: ready ? 1 : .86, x: ready ? 0 : 42, filter: ready ? 'blur(0px)' : 'blur(10px)' }}
+            transition={{ duration: reduced ? 0 : 1.08, delay: ready ? .05 : 0, ease: heroEase }}>
             <div className="showcase-device">
               <div className="showcase-topbar">
                 <div className="showcase-top-left"><PanelLeft size={16} /><span className="showcase-top-spacer" /><ArrowLeft size={14} /><ArrowRight size={14} /></div>
