@@ -1,6 +1,7 @@
-import { ArrowDown, ArrowRight, ArrowUpRight, Download, Plus } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Download, Plus } from 'lucide-react';
 import { FeatureCatalog } from '../components/feature-catalog';
-import { Enter, HeroTitle, HorizonField, ScrollTrack } from '../components/motion-scenes';
+import { Enter, ScrollTrack } from '../components/motion-scenes';
+import { HeroTheatre } from '../components/hero-theatre';
 import { WorkspaceDemo } from '../components/workspace-demo';
 
 const repository = 'https://github.com/jhonatan-oliveiradev/orla-browser';
@@ -42,29 +43,8 @@ export default function Home() {
       </header>
 
       <main id="conteudo">
-        <section className="new-hero" id="inicio" aria-label="Apresentação do Orla Browser">
-          <div className="hero-ambient" aria-hidden="true" />
-          <HorizonField />
-          <div className="wide-shell hero-inner">
-            <div className="hero-eyebrow">
-              <span className="eyebrow-left"><i /> ORLA BROWSER <span className="eyebrow-divider">/</span> WINDOWS</span>
-              <span className="hero-edition">NAVEGADOR EM DESENVOLVIMENTO — 2026</span>
-            </div>
-            <HeroTitle />
-            <div className="hero-bottom">
-              <div className="hero-intro">
-                <span className="micro-label">O NAVEGADOR PARA O QUE VOCÊ ESTÁ FAZENDO.</span>
-                <p>Organize abas, capturas e sessões por espaço de trabalho. Mude de assunto sem perder o ponto onde parou.</p>
-                <div className="hero-ctas">
-                  <DownloadLink />
-                  <a className="text-arrow-link" href="#experimente">Explorar o Orla <ArrowUpRight size={18} /></a>
-                </div>
-              </div>
-              <a href="#experimente" className="hero-scroll"><span>ROLE PARA EXPLORAR</span><ArrowDown size={18} /></a>
-            </div>
-            <div className="hero-footnote" aria-hidden="true"><span>ABAS / ESPAÇOS / REFERÊNCIAS</span><span>FEITO PARA CONTINUAR</span></div>
-          </div>
-        </section>
+        <HeroTheatre download={download} />
+
 
         <section className="showcase-section" id="experimente" aria-labelledby="showcase-title">
           <div className="wide-shell">
