@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
 import './globals.css';
+import './site-v2.css';
 
 const manrope = localFont({
   src: './manrope.woff2',
@@ -10,18 +11,31 @@ const manrope = localFont({
   variable: '--font-manrope',
 });
 
+const title = 'Orla Browser — Você não trabalha em abas. Trabalha em projetos.';
+const description = 'Orla é um navegador para Windows que organiza abas, capturas e sessões por espaço de trabalho. Conheça a demonstração e baixe a prévia para Windows x64.';
+
 export const metadata: Metadata = {
-  title: 'Orla Browser — Abra espaço para suas ideias',
-  description: 'Um navegador para Windows que reúne abas, sessões e referências em espaços de trabalho. Explore a demonstração e baixe a prévia.',
-  other: { 'page-type': 'software', 'site-kind': 'software' },
+  metadataBase: new URL('https://orla-browser.vercel.app'),
+  title,
+  description,
+  applicationName: 'Orla Browser',
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'Orla Browser — Abra espaço para suas ideias',
-    description: 'Organize abas, sessões e referências em espaços de trabalho. Experimente o Orla para Windows.',
+    title,
+    description,
     type: 'website',
     locale: 'pt_BR',
+    siteName: 'Orla Browser',
+    url: '/',
   },
+  twitter: {
+    card: 'summary',
+    title,
+    description,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="pt-BR" data-type="software" className={manrope.variable}><body>{children}</body></html>;
+  return <html lang="pt-BR" className={manrope.variable}><body>{children}</body></html>;
 }
