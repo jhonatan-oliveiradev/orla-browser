@@ -45,6 +45,7 @@ export default function Home() {
 
       <main id="conteudo">
         <OpeningExperience download={download} />
+        <noscript><style>{'.orla-opening { display: none !important; } .hero-statement h1, .hero-statement > p, .hero-statement-actions, .stage-perspective { opacity: 1 !important; filter: none !important; transform: none !important; }'}</style></noscript>
 
         <section className="showcase-section" id="experimente" aria-labelledby="showcase-title">
           <div className="wide-shell">
