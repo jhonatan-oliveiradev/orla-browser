@@ -24,6 +24,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
   const orlaRef = useRef<HTMLSpanElement>(null);
   const browserRef = useRef<HTMLSpanElement>(null);
   const timeoutIds = useRef<number[]>([]);
+  const previousOverflow = useRef<string | null>(null);
   const finishRef = useRef<() => void>(() => {});
 
   const reveal = phase === 'reveal' || phase === 'done';
@@ -32,6 +33,10 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
   const finish = useCallback(() => {
     timeoutIds.current.forEach(window.clearTimeout);
     timeoutIds.current = [];
+    if (previousOverflow.current !== null) {
+      document.body.style.overflow = previousOverflow.current;
+      previousOverflow.current = null;
+    }
     try {
       window.sessionStorage.setItem(SESSION_KEY, 'seen');
     } catch {
@@ -81,7 +86,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
+    previousOverflow.current = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     setPhase('center');
 
@@ -118,7 +123,10 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
     return () => {
       timeoutIds.current.forEach(window.clearTimeout);
       timeoutIds.current = [];
-      document.body.style.overflow = previousOverflow;
+      if (previousOverflow.current !== null) {
+        document.body.style.overflow = previousOverflow.current;
+        previousOverflow.current = null;
+      }
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
