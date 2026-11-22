@@ -52,7 +52,7 @@ export default function Home() {
             <div className="showcase-intro">
               <span className="section-index">01 — A EXPERIÊNCIA</span>
               <Enter className="showcase-heading">
-                <h2 id="showcase-title">O contexto fica.<br /><span>Mesmo quando você muda de assunto.</span></h2>
+                <h2 id="showcase-title">Fechou o projeto?<br /><span>Ele continua onde você deixou.</span></h2>
                 <p>Um espaço para o trabalho, outro para a pesquisa, outro para o que vier. Veja o Orla em funcionamento nesta demonstração interativa.</p>
               </Enter>
             </div>
@@ -85,7 +85,7 @@ export default function Home() {
             <div className="feature-topline"><span className="section-index">03 — AS FERRAMENTAS</span><span>CRIADAS PARA O DIA A DIA</span></div>
             <Enter className="feature-intro">
               <h2 id="features-title">Poucos gestos.<br /><em>Mais controle.</em></h2>
-              <p>Não é uma lista de recursos para impressionar. É o que ajuda quando há mais de uma coisa acontecendo ao mesmo tempo.</p>
+              <p>Troque de projeto, compare páginas e retome uma referência sem desmontar seu espaço de trabalho.</p>
             </Enter>
             <FeatureCatalog />
           </div>
