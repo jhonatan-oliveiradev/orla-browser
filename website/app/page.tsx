@@ -2,6 +2,7 @@ import { ArrowRight, ArrowUpRight, Download, Plus } from 'lucide-react';
 import { FeatureCatalog } from '../components/feature-catalog';
 import { Enter, ScrollTrack } from '../components/motion-scenes';
 import { HeroTheatre } from '../components/hero-theatre';
+import { CoastEmblem } from '../components/coast-emblem';
 import { WorkspaceDemo } from '../components/workspace-demo';
 
 const repository = 'https://github.com/jhonatan-oliveiradev/orla-browser';
@@ -73,7 +74,7 @@ export default function Home() {
               <h2 id="interlude-title">O problema nunca foi ter <em>muitas abas.</em><br />Foi perder o caminho entre elas.</h2>
             </Enter>
             <div className="interlude-bottom">
-              <span className="large-asterisk" aria-hidden="true">✳</span>
+              <CoastEmblem />
               <p>Uma pesquisa vira referência. A referência abre outra página. Quando você volta ao projeto, precisa lembrar onde tudo ficou. O Orla foi pensado para preservar esse contexto.</p>
             </div>
           </div>
