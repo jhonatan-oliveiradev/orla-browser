@@ -774,3 +774,224 @@ html { scroll-padding-top: 100px; }
   .feature-intro h2 { font-size: clamp(41px, 10.7vw, 66px); }
   .local-copy h2 { margin-top: 0; }
 }
+
+
+/* ==========================================================================
+   Opening sequence / ORLA BROWSER
+   One authored spatial transition: center -> horizontal split -> corner dock.
+   The two curtains open at the horizon and expose the already-mounted hero.
+   ========================================================================== */
+
+.orla-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  isolation: isolate;
+  overflow: clip;
+  background: transparent;
+  color: #f1f4ea;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.orla-opening-curtain {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  width: 100%;
+  height: 50.1%;
+  will-change: transform;
+  pointer-events: none;
+}
+.orla-opening-curtain-top {
+  top: 0;
+  background:
+    radial-gradient(ellipse 36% 28% at 50% 100%, #20372b 0%, transparent 100%),
+    linear-gradient(180deg, #060b09 30%, #0d1812 100%);
+}
+.orla-opening-curtain-bottom {
+  bottom: 0;
+  background:
+    radial-gradient(ellipse 40% 30% at 50% 0%, #20372b 0%, transparent 100%),
+    linear-gradient(0deg, #060b09 30%, #0d1812 100%);
+}
+.orla-opening-word {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: max-content;
+  max-width: none;
+  translate: -50% -50%;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: clamp(32px, 6.4vw, 112px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -.048em;
+  white-space: nowrap;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.orla-opening-word-orla {
+  color: #f4f6ed;
+}
+.orla-opening-word-browser {
+  color: #d8fb82;
+  font-weight: 740;
+  letter-spacing: -.03em;
+}
+.orla-opening-seam {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: min(36vw, 520px);
+  height: 1px;
+  translate: -50% -50%;
+  transform-origin: center;
+  background: linear-gradient(90deg, transparent, #d8fb827a 47%, transparent);
+  pointer-events: none;
+}
+.orla-opening-corner {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  width: 33px;
+  height: 33px;
+  pointer-events: none;
+}
+.orla-opening-corner-a {
+  left: clamp(20px, 4.5vw, 70px);
+  top: clamp(23px, 4vw, 58px);
+  border-top: 1px solid #d8fb826d;
+  border-left: 1px solid #d8fb826d;
+}
+.orla-opening-corner-b {
+  right: clamp(20px, 4.5vw, 70px);
+  bottom: clamp(23px, 4vw, 58px);
+  border-right: 1px solid #d8fb826d;
+  border-bottom: 1px solid #d8fb826d;
+}
+.orla-opening-skip {
+  position: absolute;
+  z-index: 5;
+  top: clamp(18px, 3.6vw, 45px);
+  right: clamp(18px, 4vw, 60px);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 1px solid #99b49b;
+  border-radius: 0;
+  background: transparent;
+  color: #e9eee4;
+  font-size: 12px;
+  font-weight: 660;
+  letter-spacing: .015em;
+  line-height: 1.4;
+  transition: color .2s ease, border-color .2s ease;
+}
+.orla-opening-skip > span {
+  color: #d8fb82;
+  font-size: 15px;
+  transition: transform .2s ease;
+}
+.orla-opening-skip:hover,
+.orla-opening-skip:focus-visible { color: #d8fb82; border-color: #d8fb82; }
+.orla-opening-skip:hover > span { transform: translate(2px, -2px); }
+.orla-opening[data-phase='reveal'] {
+  pointer-events: none;
+}
+.orla-opening[data-phase='reveal'] .orla-opening-skip {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The complete product scene is the reward for the opening, not another loader. */
+.cinematic-hero {
+  min-height: max(810px, calc(100svh - 78px));
+  padding-top: clamp(85px, 9.3vw, 160px);
+  background: #080d0b;
+}
+.cinematic-hero::before {
+  background:
+    radial-gradient(ellipse 40% 53% at 73% 49%, #355f476b 0%, #1a392f2c 58%, transparent 100%),
+    radial-gradient(ellipse 40% 56% at 74% 69%, #284d422f 0%, transparent 92%),
+    #080d0b;
+}
+.hero-reveal-glow {
+  position: absolute;
+  z-index: -1;
+  inset: -5% -8% 3% 34%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 39% 45% at 64% 48%, #b2df9b36 0%, transparent 92%),
+    radial-gradient(ellipse 44% 32% at 66% 75%, #81b89616 0%, transparent 98%);
+  mix-blend-mode: screen;
+}
+.hero-composition {
+  min-height: clamp(645px, 51vw, 760px);
+}
+.hero-statement h1 {
+  font-size: clamp(54px, 5.45vw, 93px);
+  line-height: 1.04;
+  letter-spacing: -.043em;
+}
+.cinematic-stage {
+  isolation: isolate;
+}
+.cinematic-stage::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 5% -4% 1%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, #a5d88b30, #3b785229 44%, transparent 73%);
+  filter: blur(43px);
+  pointer-events: none;
+}
+.showcase-device {
+  border-color: #718b7782;
+  box-shadow:
+    0 50px 120px -38px #000f,
+    0 20px 38px -19px #020902d9,
+    inset 0 1px 0 #f0ffe83b;
+}
+.showcase-device::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(130deg, #ffffff12 0%, transparent 29%, transparent 75%, #d8fb8208);
+}
+.hero-interaction-row {
+  position: relative;
+  z-index: 2;
+}
+@media (max-width: 1080px) {
+  .cinematic-hero { min-height: 0; padding-top: 90px; }
+  .hero-composition { min-height: 0; }
+}
+@media (max-width: 680px) {
+  .orla-opening-word {
+    font-size: clamp(31px, 7.9vw, 48px);
+  }
+  .orla-opening-skip { font-size: 11px; }
+  .orla-opening-corner { width: 19px; height: 19px; }
+  .cinematic-hero { padding-top: 73px; }
+  .hero-reveal-glow { inset: 17% -22% 8% -4%; opacity: .7; }
+  .hero-statement h1 { letter-spacing: -.04em; font-size: clamp(43px, 11.1vw, 69px); }
+  .cinematic-stage::before { filter: blur(22px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orla-opening { display: none !important; }
+  .orla-opening-word,
+  .orla-opening-curtain,
+  .orla-opening-seam { will-change: auto; }
+}
