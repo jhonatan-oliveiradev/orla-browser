@@ -82,7 +82,10 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
       // Private browsing may disable storage.
     }
 
-    const shouldSkip = Boolean(reducedMotion) || seen ||
+    // Preview reviewers can replay the complete choreography with ?intro=1.
+    // Reduced-motion always wins, even when replay is requested.
+    const forceReplay = new URLSearchParams(window.location.search).get('intro') === '1';
+    const shouldSkip = Boolean(reducedMotion) || (!forceReplay && seen) ||
       window.location.hash.length > 0 || window.scrollY > 40;
 
     if (shouldSkip) {
