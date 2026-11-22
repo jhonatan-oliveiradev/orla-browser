@@ -48,7 +48,7 @@ export default function Home() {
           <div className="wide-shell hero-inner">
             <div className="hero-eyebrow">
               <span className="eyebrow-left"><i /> ORLA BROWSER <span className="eyebrow-divider">/</span> WINDOWS</span>
-              <span className="hero-edition">UM OUTRO JEITO DE NAVEGAR — 01/26</span>
+              <span className="hero-edition">NAVEGADOR EM DESENVOLVIMENTO — 2026</span>
             </div>
             <HeroTitle />
             <div className="hero-bottom">
