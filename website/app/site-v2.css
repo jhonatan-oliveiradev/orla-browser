@@ -745,3 +745,17 @@ html { scroll-padding-top: 100px; }
 @media (prefers-reduced-motion: reduce) {
   .stage-perspective, .scene-transition, .hero-scene-button > span { transition: none !important; animation: none !important; }
 }
+
+
+/* Authored coastal cartography. SVG linework is product identity, not stock art. */
+.interlude-bottom { align-items: center; gap: clamp(20px, 4vw, 70px); }
+.coast-emblem { width: 100%; min-width: 0; margin: 0; }
+.coast-emblem svg { width: min(100%, 620px); height: auto; display: block; overflow: visible; }
+.coast-emblem figcaption { margin-top: 4px; color: #91a692; font-size: 12px; line-height: 1.5; }
+.interlude-inner h2 { position: relative; z-index: 1; }
+.interlude-bottom > p { max-width: 29ch; }
+@media (max-width: 620px) {
+  .coast-emblem { margin-inline: -24px; width: calc(100% + 48px); }
+  .coast-emblem figcaption { padding-inline: 24px; font-size: 11px; }
+  .interlude-bottom > p { max-width: 45ch; }
+}
