@@ -158,7 +158,7 @@ export function HeroTheatre({ download, revealed = true }: { download: string; r
       </div>
       <div className="wide-shell hero-composition">
         <div className="hero-statement">
-          <motion.h1 id="hero-title" initial={false}
+          <motion.h1 id="hero-title" tabIndex={-1} initial={false}
             animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 30, filter: ready ? 'blur(0px)' : 'blur(7px)' }}
             transition={{ duration: reduced ? 0 : .82, delay: ready ? .12 : 0, ease: heroEase }}>
             Você não trabalha<br />em abas.<br /><em>Trabalha em projetos.</em>
