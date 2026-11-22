@@ -31,7 +31,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
   const active = phase !== 'done';
 
   const finish = useCallback(() => {
-    timeoutIds.current.forEach(window.clearTimeout);
+    timeoutIds.current.forEach((id) => window.clearTimeout(id));
     timeoutIds.current = [];
     if (previousOverflow.current !== null) {
       document.body.style.overflow = previousOverflow.current;
@@ -63,11 +63,15 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
       });
     };
 
+    let mounted = true;
     measure();
     window.addEventListener('resize', measure, { passive: true });
     // Re-measure after the locally hosted typeface settles.
-    void document.fonts?.ready.then(measure);
-    return () => window.removeEventListener('resize', measure);
+    void document.fonts?.ready.then(() => { if (mounted) measure(); });
+    return () => {
+      mounted = false;
+      window.removeEventListener('resize', measure);
+    };
   }, []);
 
   useEffect(() => {
@@ -106,6 +110,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
       if (event.key === 'Escape') {
         event.preventDefault();
         finishRef.current();
+        window.requestAnimationFrame(() => document.getElementById('hero-title')?.focus());
       }
       // Keep focus on the skip control while the visual curtain is present.
       if (event.key === 'Tab') {
@@ -121,7 +126,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      timeoutIds.current.forEach(window.clearTimeout);
+      timeoutIds.current.forEach((id) => window.clearTimeout(id));
       timeoutIds.current = [];
       if (previousOverflow.current !== null) {
         document.body.style.overflow = previousOverflow.current;
@@ -131,6 +136,11 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [onReveal, reducedMotion]);
+
+  const skipAndFocus = () => {
+    finish();
+    window.requestAnimationFrame(() => document.getElementById('hero-title')?.focus());
+  };
 
   if (!active) return null;
 
@@ -234,7 +244,7 @@ function OpeningSequence({ onReveal }: { onReveal: () => void }) {
         type="button"
         id="orla-skip-opening"
         className="orla-opening-skip"
-        onClick={finish}
+        onClick={skipAndFocus}
         aria-label="Pular introdução e acessar o Orla Browser"
       >
         Pular introdução <span aria-hidden="true">↗</span>
