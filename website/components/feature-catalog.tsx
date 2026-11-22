@@ -1,55 +1,94 @@
 import { ArrowUpRight, Bookmark, Braces, Columns2, FolderOpen, History, LayoutGrid, Search } from 'lucide-react';
+import { Enter } from './motion-scenes';
 
-const features = [
-  { id: 'espacos', title: 'Espaços de trabalho', description: 'Separe as abas por projeto e volte com as páginas no lugar.', icon: LayoutGrid, mode: true },
-  { id: 'dividir', title: 'Tela dividida', description: 'Compare duas páginas na mesma janela e ajuste a largura de cada uma.', icon: Columns2, mode: true },
-  { id: 'capturas', title: 'Capturas', description: 'Guarde trechos e referências e encontre o que precisa pela busca.', icon: Bookmark, mode: true },
-  { id: 'sessoes', title: 'Sessões salvas', description: 'Reabra as abas de uma sessão ou exporte uma cópia em JSON.', icon: History },
-  { id: 'busca', title: 'Busca de abas', description: 'Use a barra de endereços para encontrar páginas e espaços já abertos.', icon: Search },
-  { id: 'devtools', title: 'Ferramentas de desenvolvimento', description: 'Abra o DevTools com F12 e encaixe o painel dentro da janela.', icon: Braces },
+const stories = [
+  {
+    id: 'espacos',
+    eyebrow: '01 / ESPAÇOS',
+    title: 'Um projeto. Um espaço. Suas abas no lugar.',
+    description: 'Separe o que está pesquisando, criando ou revisando. Cada espaço mantém suas próprias abas para você voltar sem reconstruir tudo.',
+    icon: LayoutGrid,
+  },
+  {
+    id: 'dividir',
+    eyebrow: '02 / TELA DIVIDIDA',
+    title: 'Duas páginas. Nenhum malabarismo de janelas.',
+    description: 'Leia uma referência enquanto trabalha na outra página. Ajuste a largura dos dois lados arrastando a divisão.',
+    icon: Columns2,
+  },
+  {
+    id: 'capturas',
+    eyebrow: '03 / CAPTURAS',
+    title: 'O link que vale guardar não precisa se perder.',
+    description: 'Salve trechos e referências do que encontrou pelo caminho. Depois, procure nas capturas sem ter de lembrar em qual aba estava.',
+    icon: Bookmark,
+  },
 ] as const;
 
-type Feature = (typeof features)[number];
+const details = [
+  { index: '04', title: 'Sessões que você pode retomar', description: 'Reabra as abas de uma sessão ou exporte uma cópia em JSON.', icon: History },
+  { index: '05', title: 'Busca entre abas abertas', description: 'Encontre páginas e espaços pela própria barra de endereços.', icon: Search },
+  { index: '06', title: 'DevTools onde você precisa', description: 'Abra as ferramentas com F12 e encaixe o painel na janela.', icon: Braces },
+] as const;
+
+type StoryId = (typeof stories)[number]['id'];
 
 export function FeatureGlyphs() {
-  return (
-    <div className="feature-glyphs" aria-hidden="true">
-      {features.map(({ id, icon: Icon }) => <span key={id} className="feature-glyph" data-feature={id}><Icon size={29} strokeWidth={1.55} /></span>)}
-    </div>
-  );
+  return <div className="feature-glyphs" aria-hidden="true">
+    {stories.map(({ id, icon: Icon }) => <span key={id} className="feature-glyph" data-feature={id}><Icon size={29} strokeWidth={1.55} /></span>)}
+  </div>;
 }
 
-function FeaturePreview({ id }: { id: Feature['id'] }) {
+function FeaturePreview({ id }: { id: StoryId }) {
   return (
     <div className="catalog-preview" data-visual data-feature={id} aria-hidden="true">
       <div className="mini-window">
         <div className="mini-chrome"><i /><i /><i /><span>Orla</span></div>
-        {id === 'espacos' && <div className="mini-workspaces"><div><strong><LayoutGrid /> Estúdio</strong><span>Portfólio</span><span>Guia de estilo</span></div><div><strong><FolderOpen /> Pesquisa</strong><span>Referências</span><span>Notas de campo</span></div></div>}
-        {id === 'dividir' && <div className="mini-split"><div><b>Guia de estilo</b><i /><i /><i /></div><div><b>Notas</b><i /><i /><i /></div></div>}
-        {id === 'capturas' && <div className="mini-captures"><span><Search /> Buscar nas capturas</span><strong><Bookmark /> Contraste e cor</strong><strong><Bookmark /> Escala tipográfica</strong></div>}
-        {id === 'sessoes' && <div className="mini-sessions"><strong><History /> Sessões salvas</strong><span>Estúdio <small>3 abas</small></span><span>Pesquisa <small>2 abas</small></span></div>}
-        {id === 'busca' && <div className="mini-captures"><span><Search /> Portfólio <kbd>Ctrl L</kbd></span><strong><ArrowUpRight /> Portfólio / Estúdio</strong><strong><FolderOpen /> Portfólio / Pesquisa</strong></div>}
-        {id === 'devtools' && <div className="mini-devtools"><strong>Elementos <span>Console</span> <span>Rede</span></strong><code>&lt;main class=&quot;workspace&quot;&gt;<br />&nbsp; &lt;nav&gt;…&lt;/nav&gt;<br />&lt;/main&gt;</code></div>}
+        {id === 'espacos' && <div className="mini-workspaces">
+          <div><strong><LayoutGrid /> Estúdio</strong><span>Portfólio</span><span>Guia de estilo</span><span>Revisão</span></div>
+          <div><strong><FolderOpen /> Pesquisa</strong><span>Referências</span><span>Notas de campo</span><span>Inspirações</span></div>
+        </div>}
+        {id === 'dividir' && <div className="mini-split">
+          <div><b>Guia de estilo</b><i /><i /><i /><i /><i /></div>
+          <div><b>Notas</b><i /><i /><i /><i /><i /></div>
+        </div>}
+        {id === 'capturas' && <div className="mini-captures">
+          <span><Search /> Buscar nas capturas</span>
+          <strong><Bookmark /> Contraste e cor</strong>
+          <strong><Bookmark /> Escala tipográfica</strong>
+          <strong><Bookmark /> Referências do portfólio</strong>
+        </div>}
       </div>
+      <div className="visual-corner"><span>ORLA / {id.toUpperCase()}</span><span>↗</span></div>
     </div>
   );
 }
 
 export function FeatureCatalog() {
   return (
-    <div className="catalog">
-      {features.map((item) => {
-        const { id, title, description, icon: Icon } = item;
-        return <article className="catalog-item" data-feature={id} key={id}>
-          <FeaturePreview id={id} />
-          <div className="catalog-body">
-            <div className="catalog-icon" aria-hidden="true"><Icon size={19} /></div>
+    <div className="feature-editorial-list">
+      {stories.map(({ id, eyebrow, title, description }) => (
+        <article className="feature-story" data-feature={id} key={id}>
+          <Enter className="feature-story-copy">
+            <span className="feature-story-eyebrow">{eyebrow}</span>
             <h3>{title}</h3>
             <p>{description}</p>
-            {'mode' in item && <a href={`#mode-${id}`} className="catalog-link" aria-label={`Testar ${title.toLocaleLowerCase('pt-BR')} na demonstração`}>Testar na demonstração <ArrowUpRight size={14} /></a>}
-          </div>
-        </article>;
-      })}
+            <a href={'#mode-' + id} className="story-link">Experimentar o recurso <ArrowUpRight size={17} /></a>
+          </Enter>
+          <Enter className="feature-story-visual" delay={0.1}>
+            <FeaturePreview id={id} />
+          </Enter>
+        </article>
+      ))}
+      <div className="minor-features">
+        {details.map(({ index, title, description, icon: Icon }) => (
+          <article className="minor-feature" key={index}>
+            <span>{index} / 06</span>
+            <Icon size={22} strokeWidth={1.35} aria-hidden="true" />
+            <div><h3>{title}</h3><p>{description}</p></div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
