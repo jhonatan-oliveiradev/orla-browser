@@ -665,7 +665,6 @@ html { scroll-padding-top: 100px; }
 @media (max-width: 680px) {
   .cinematic-hero { padding-top: 60px; }
   .hero-statement h1 { font-size: clamp(45px, 11.5vw, 70px); line-height: 1.075; letter-spacing: -.038em; }
-  .hero-statement h1 br:first-of-type { display: none; }
   .hero-statement > p { margin-top: 21px; font-size: 16px; }
   .hero-statement-actions { margin-top: 25px; gap: 17px; }
   .hero-statement-actions .download-button { min-height: 50px; font-size: 13px; padding-inline: 16px; }
