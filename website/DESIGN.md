@@ -27,3 +27,6 @@ The Orla interface arrives in perspective and settles with scrolling. Visitors c
 
 ## Reference interpretation
 Raycast: software-first. TasteCode: product demonstration. Taste Skill: intentional composition. ArtCraft: strong layout rhythm and bespoke vector geometry. Do not reproduce these sites.
+
+## Cinematic entry sequence
+On the first visit of each browser session, ORLA and BROWSER appear side by side in the center. They split horizontally, then ORLA docks to the upper-left and BROWSER to the lower-right. Paired dark curtains part from the viewport's middle to reveal the already-mounted hero. The hero stage, headline, copy and primary actions enter in a staggered but synchronized sequence. Total curtain sequence: about 3 seconds. Returning visitors, direct anchor visits and reduced-motion users skip the sequence. A visible skip control and Escape allow immediate navigation. The scroll lock must always be released on completion, skip, visibility change and cleanup. The hero is still content-first with JavaScript disabled.
