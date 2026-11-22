@@ -14,10 +14,10 @@ export function Enter({ children, className = '', delay = 0 }: { children: React
   return (
     <motion.div
       className={className}
-      initial={reduced ? false : { opacity: 0, y: 46, filter: 'blur(7px)' }}
+      initial={reduced ? false : { opacity: .15, y: 18, filter: 'blur(2px)' }}
       whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       viewport={{ once: true, amount: 0.16, margin: '0px 0px -40px 0px' }}
-      transition={{ duration: reduced ? 0 : 0.9, delay: reduced ? 0 : delay, ease: [0.2, 0.75, 0.14, 1] }}
+      transition={{ duration: reduced ? 0 : .66, delay: reduced ? 0 : delay, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.div>
